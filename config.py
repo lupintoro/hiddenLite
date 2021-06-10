@@ -322,7 +322,7 @@ with open(args.filename, 'r+b') as file:
                     payload2.append(payload_field)
 
 
-                if payload2[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]):
+                if payload2[0] == 'table' and ('CREATE TABLE' or 'create table' in payload2[4]):
 
                     if payload2[1] == 'sqlite_sequence':
                         payload2[1] = 'sequence_copy'
@@ -374,7 +374,7 @@ with open(args.filename, 'r+b') as file:
 
 
 
-                if payload[0] == 'table':
+                if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]):
                     #Continue completing config.json with table/fields information
                     table_name = payload[1]
                     fields = payload[4].split('(',1)[1]
