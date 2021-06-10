@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import os, sys, struct, json, mmap, sqlite3, string
+import argparse, os, sys, struct, json, mmap, sqlite3, string
 import regex as re
 
 
@@ -38,6 +38,7 @@ everything = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])*)'
 everything_not_null = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])+)'
 
 
+types_list = ['zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null', 'numeric', 'numeric_not_null', 'blob', 'blob_not_null']
 
 types_sub = {'(INTEGER PRIMARY KEY)':'zero', '((INT|DATE)(?!.*NO.*NULL))':'integer', '((INT|DATE)(.*NO.*NULL))':'integer_not_null', 
 '(BOOL(?!.*NO.*NULL))':'boolean', '(BOOL.*NO.*NULL)':'boolean_not_null', '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'text', 
@@ -101,12 +102,12 @@ def serialTypes(serial_type):
 def regex_types(fields_types_):
     for key,value in types_sub.items():
         fields_types_ = re.sub(rf'.*{key}.*', value, fields_types_, flags=re.IGNORECASE)
-    return(fields_types_)
+    return fields_types_
 
 
 
 #Function that builds regexes for each table, concatenating regexes of header of record + regexes of each column
-def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, freeblock=bool, type1=bool): #payloads_patterns
+def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario, freeblock=bool, type1=bool): #payloads_patterns
     
     headers_patterns_copy = []
     j=0
@@ -118,6 +119,8 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             fields_types_ = fields_types[j]
             #Replace each type with regex of type : e.g. ['INTEGER NOT NULL', 'INTEGER NOT NULL', 'LONGVARCHAR NOT NULL'] --> #e.g. ['integer', 'integer', 'text']
             fields_types_ = regex_types(fields_types_)
+            if fields_types_ not in types_list:
+                fields_types_ = 'numeric'
             #Add it to list header_pattern to create a header pattern
             header_pattern.append(fields_types_)
             j+=1
@@ -257,7 +260,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
         
 
         #Regex for serial types array length, min and max size
-        if not freeblock:
+        if not freeblock or scenario == 3:
             for element in header_pattern:
                 counter_min += 1
                 if element in multiple_bytes:
@@ -269,7 +272,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
                 y = counter_max%128
                 counter_min = format(counter_min,'x').zfill(2)
                 counter_max = format(128,'x').zfill(2)
-                x += 128
+                x = 129
                 x = format(x,'x').zfill(2)
                 y = format(y,'x').zfill(2)
                 serial_types_array_length = rf'(([\x{counter_min}-\x{counter_max}]{{1}})|([\x{x}]{{1}}[\x00-\x{y}]{{1}}))'
@@ -293,21 +296,26 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             header_pattern.insert(0, '(')
             header_pattern.insert(len(header_pattern), ')')
 
+    
     #Regex for row_id
     row_id = r'((([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})){1})'
-    
+ 
     #Start of header if freeblock (offset of next freeblock + freeblock length)
     if freeblock:
-        for index in range(len(freeblock_min_max)):
-            start_header = '(' + next_freeblock + freeblock_min_max[index] + ')'
-            starts_headers.append(start_header)
+        if scenario == 3:
+            for index in range(len(freeblock_min_max)):
+                start_header = '(' + next_freeblock + freeblock_min_max[index] + array_min_max[index] + ')'
+                starts_headers.append(start_header)
+        else:
+            for index in range(len(freeblock_min_max)):
+                start_header = '(' + next_freeblock + freeblock_min_max[index] + ')'
+                starts_headers.append(start_header)
     
     #Start of header if no freeblock (payload length, row_id, serial types array length)
     else:
         for index in range(len(payload_min_max)):
             start_header = '(' + payload_min_max[index] + row_id + array_min_max[index] + ')'
             starts_headers.append(start_header)
-
 
     # for payload_pattern in payloads_patterns:
     #     for n,i in enumerate(payload_pattern):
@@ -324,10 +332,9 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
     #     headers_patterns[i].extend(payloads_patterns)
 
 
-
     #For each header pattern, add start of header [payload length, rowid and types length] (or freeblock) before list of types --> [payload length, rowid, types length, type1, type2, etc.]
     for header_pattern in headers_patterns:
-        
+
         #Replace each literal expression of regex with real regex
         for n,i in enumerate(header_pattern):
             for k,v in dict_types.items():
@@ -336,7 +343,8 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
 
         index = headers_patterns.index(header_pattern)
         header_pattern.insert(0, starts_headers[index])
-
+        
+        
         #Concatenate all regexes of a table
         #E.g. [[\x00]{1}, [\x00-\x09]{1}, [\x00-\x09]{1}] --> [[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}]
         regex_construct = ''.join(header_pattern)
@@ -347,6 +355,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
         #Append to list of regexes
         regex_constructs.append(regex_construct)
 
+
     #Link together table name, table's fields and regex for that table
     for i in range(len(regex_constructs)):
         table_regex = {tables_names[i]:[lists_fields[i], headers_patterns_copy[i], regex_constructs[i]]}
@@ -356,8 +365,10 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
 
 
 
+
+
 #Function that decodes bytes from possible header into integers (so that we can do calculations on it after) and appends them to unknown_header list
-def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header, freeblock=bool):
+def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header, scenario, freeblock=bool):
     #WITH ROWID
     count = 0
     #While not end of the match
@@ -365,11 +376,26 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
         #If [payload length, rowid, types length] part --> not serial types so just append(byte) and not append(serialTypes(byte))
         if len(unknown_header) < len_start_header:
             #If it's a freeblock, read 2 bytes then 2 bytes
-            if freeblock:
+            if freeblock and scenario==3:
                 byte = int(struct.unpack('>H', file.read(2))[0])
                 unknown_header.append(byte)
                 unknown_header_2.append(byte)
                 count+=2
+                byte1 = int(struct.unpack('>H', file.read(2))[0])
+                unknown_header.append(byte1)
+                unknown_header_2.append(byte1)
+                count+=2
+                byte2 = int(struct.unpack('>B', file.read(1))[0])
+                unknown_header.append(byte2)
+                unknown_header_2.append(byte2)
+                count+=1
+            
+            elif freeblock and scenario!=3:
+                byte = int(struct.unpack('>H', file.read(2))[0])
+                unknown_header.append(byte)
+                unknown_header_2.append(byte)
+                count+=2
+            
             else:
                 #Read byte by byte, convert in int, and append to unknown_header list
                 byte = int(struct.unpack('>B', file.read(1))[0])
@@ -534,8 +560,64 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
 
 
 
+def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z):
+    #Go to the end of the match to start reading payload content that comes just after header
+    file.seek(b)
+    #For each length of each type
+    for l in ((unknown_header)[z:]):
+        
+        #Read bytes for that length and decode it according to encoding : e.g. [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] --> read following number of bytes [0, 24, 7, 1, 0, 8, 0]
+        payload_field = file.read(l)
+        #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
+        payload.append(payload_field)
+
+    for n,i in enumerate(fields_regex[1]):
+        if i == 'zero':
+            try:
+                payload[n] = unknown_header[1]
+            except IndexError:
+                pass
+        elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
+            payload[n] = int.from_bytes(payload[n], byteorder='big', signed=True)
+            try:
+                if unknown_header_2[z+n] == 8:
+                    payload[n] = 0
+                elif unknown_header_2[z+n] == 9:
+                    payload[n] = 1
+            except IndexError:
+                pass
+        else:
+            payload[n] = payload[n].decode('utf-8', errors='ignore')
+            payload[n] = payload[n].replace("'", " ")
+
+
+    if (len(unknown_header) > 3) and (unknown_header[3] == 0):
+        payload[0] = unknown_header[1]
+
+    payload.insert(0, record_infos)
+
+    for element in payload:
+        if isinstance(element, bytes):
+            index = payload.index(element)
+            payload.remove(element)
+            payload.insert(index, 'error')
+
+    connection = sqlite3.connect(output_db)
+    cursor = connection.cursor()
+    statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
+    cursor.execute(statement)
+    connection.commit()
+    connection.close()
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('config')
+parser.add_argument('main_file')
+args = parser.parse_args()
+
 #Open config file containing db infos, each table and type of column per table
-with open('config.json', 'r') as config_file:
+with open(args.config, 'r') as config_file:
     #Load content
     data = json.load(config_file)
     #Close file
@@ -545,6 +627,10 @@ fields_numbers = []
 fields_types = []
 tables_names = []
 fields_names = []
+
+for key,value in data[0].items():
+    if key == "output db":
+        output_db = value
 
 #TODO: read db_infos to retrieve db encoding (e.g. UTF-8)
 
@@ -576,9 +662,10 @@ tables_regexes = []
 list_fields = []
 lists_fields = []
 starts_headers = []
-#payloads_patterns = []
 
-build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, freeblock=False, type1=False) #payloads_patterns
+
+build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario=0, freeblock=False, type1=False) #payloads_patterns
+
 
 
 header_pattern_s1 = []
@@ -589,8 +676,7 @@ list_fields_s1 = []
 lists_fields_s1 = []
 starts_headers_s1 = []
 
-build_regex(header_pattern_s1, headers_patterns_s1, list_fields_s1, lists_fields_s1, regex_constructs_s1, tables_regexes_s1, starts_headers_s1, freeblock=True, type1=True)
-
+build_regex(header_pattern_s1, headers_patterns_s1, list_fields_s1, lists_fields_s1, regex_constructs_s1, tables_regexes_s1, starts_headers_s1, scenario=1, freeblock=True, type1=True)
 
 
 header_pattern_s2 = []
@@ -601,13 +687,24 @@ list_fields_s2 = []
 lists_fields_s2 = []
 starts_headers_s2 = []
 
-build_regex(header_pattern_s2, headers_patterns_s2, list_fields_s2, lists_fields_s2, regex_constructs_s2, tables_regexes_s2, starts_headers_s2, freeblock=True, type1=False)
+build_regex(header_pattern_s2, headers_patterns_s2, list_fields_s2, lists_fields_s2, regex_constructs_s2, tables_regexes_s2, starts_headers_s2, scenario=2, freeblock=True, type1=False)
+
+
+header_pattern_s3 = []
+headers_patterns_s3 = []
+regex_constructs_s3 = []
+tables_regexes_s3 = []
+list_fields_s3 = []
+lists_fields_s3 = []
+starts_headers_s3 = []
+
+build_regex(header_pattern_s3, headers_patterns_s3, list_fields_s3, lists_fields_s3, regex_constructs_s3, tables_regexes_s3, starts_headers_s3, scenario=3, freeblock=True, type1=False)
 
 
 
 
 #Open db file (or other file) in binary format for reading
-with open('20MinDatabase.db', 'r+b') as file:
+with open(args.main_file, 'r+b') as file:
     #mmap: instead of file.read() or file.readlines(), also works for big files, file content is internally loaded from disk as needed
     mm = mmap.mmap(file.fileno(), 0)
 
@@ -618,7 +715,6 @@ with open('20MinDatabase.db', 'r+b') as file:
     # For each regex of types per table : e.g. table urls regex.Regex(b'(([\x01-\x80]{1})|([\x81-\xff]{1}[\x00-\x80]{1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{0,1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{1}))[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}(([\x08]|[\x09]){1})(([\x08]|[\x09]){1})', flags=regex.A | regex.V0)
     for table_regex in tables_regexes:
         for table, fields_regex in table_regex.items():
-
             fields_regex[0].insert(0, 'record_infos')
             # Iterate over the file (mm) and search for a match
             # Update regex module : regex 2021.4.4 : overlapped=True finds overlapping matches (match starting at an offset inside another match)
@@ -633,7 +729,7 @@ with open('20MinDatabase.db', 'r+b') as file:
                 file.seek(a)
 
                 #Decode unknown header bytes-->integers
-                decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, freeblock=False)
+                decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, scenario=0, freeblock=False)
 
                 #If limit is an empty list, header only contains start of header and is therefore a non-valid header
                 if not limit:
@@ -643,54 +739,8 @@ with open('20MinDatabase.db', 'r+b') as file:
                     payload = []
                     #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
                     if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
-                        #Go to the end of the match to start reading payload content that comes just after header
-                        file.seek(b)
-                        #For each length of each type
-                        for l in ((unknown_header)[3:]):
-                           
-                            #Read bytes for that length and decode it according to encoding : e.g. [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] --> read following number of bytes [0, 24, 7, 1, 0, 8, 0]
-                            payload_field = file.read(l)
-                            #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
-                            payload.append(payload_field)
-
-                        for n,i in enumerate(fields_regex[1]):
-                            if i == 'zero':
-                                try:
-                                    payload[n] = unknown_header[1]
-                                except IndexError:
-                                    pass
-                            elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-                                payload[n] = int.from_bytes(payload[n], byteorder='big', signed=True)
-                                try:
-                                    if unknown_header_2[3+n] == 8:
-                                        payload[n] = 0
-                                    elif unknown_header_2[3+n] == 9:
-                                        payload[n] = 1
-                                except IndexError:
-                                    pass
-                            else:
-                                payload[n] = payload[n].decode('utf-8', errors='ignore')
-                                payload[n] = payload[n].replace("'", " ")
-
-
-                        if (len(unknown_header) > 3) and (unknown_header[3] == 0):
-                            payload[0] = unknown_header[1]
-
                         record_infos = 'scenario 0, offset: ' + str(a)
-                        payload.insert(0, record_infos)
-
-                        for element in payload:
-                            if isinstance(element, bytes):
-                                index = payload.index(element)
-                                payload.remove(element)
-                                payload.insert(index, 'error')
-
-                        connection = sqlite3.connect('output.db')
-                        cursor = connection.cursor()
-                        statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
-                        cursor.execute(statement)
-                        connection.commit()
-                        connection.close()
+                        decode_record(table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                         
                         print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
 
@@ -711,7 +761,7 @@ with open('20MinDatabase.db', 'r+b') as file:
                 b = match_s1.end()
                 file.seek(a)
 
-                decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, freeblock=True)
+                decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, scenario=1, freeblock=True)
 
                 if not limit_s1:
                     pass
@@ -727,101 +777,10 @@ with open('20MinDatabase.db', 'r+b') as file:
                             x = unknown_header_s1[1] - somme(unknown_header_s1[2:]) - (b-a)
                             #Insert it on third place on header because it's type1 after freeblock
                             unknown_header_s1.insert(2, x)
-                            file.seek(b)
-                            for l in ((unknown_header_s1)[2:]):
-                                payload_field = file.read(l)
-                                payload_s1.append(payload_field)
-                            
-                            for n,i in enumerate(fields_regex_s1[1]):
-                                if i == 'zero':
-                                    try:
-                                        payload_s1[n] = unknown_header_s1[1]
-                                    except IndexError:
-                                        pass
-                                elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-                                    payload_s1[n] = int.from_bytes(payload_s1[n], byteorder='big', signed=True)
-                                    try:
-                                        if unknown_header_2_s1[2+n] == 8:
-                                            payload_s1[n] = 0
-                                        elif unknown_header_2_s1[2+n] == 9:
-                                            payload_s1[n] = 1
-                                    except IndexError:
-                                        pass
-                                else:
-                                    payload_s1[n] = payload_s1[n].decode('utf-8', errors='ignore')
-                                    payload_s1[n] = payload_s1[n].replace("'", " ")
-        
-        
-                            record_infos_s1 = 'scenario 1, offset: ' + str(a)
-                            payload_s1.insert(0, record_infos_s1)
 
-                            for element in payload_s1:
-                                if isinstance(element, bytes):
-                                    index = payload_s1.index(element)
-                                    payload_s1.remove(element)
-                                    payload_s1.insert(index, 'error')
-
-
-                            connection = sqlite3.connect('output.db')
-                            cursor = connection.cursor()
-                            statement_s1 = "INSERT INTO" + " " + table_s1 + str(tuple(fields_regex_s1[0])) + " VALUES " + str(tuple(payload_s1))
-                            cursor.execute(statement_s1)
-                            connection.commit()
-                            connection.close()
-                            
+                            record_infos = 'scenario 1, offset: ' + str(a)
+                            decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
                             print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
-
-                        
-                        
-                        # #Overwritten, freeblock has length of 2 next freeblocks --> if records are similar, we can divide by 2
-                        # elif (((somme(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1]/2 <= (somme(unknown_header_s1[2:]) + (b-a) + 9))):
-                        #     x = unknown_header_s1[1] - somme(unknown_header_s1[2:]) - (b-a)
-                        #     unknown_header_s1[1] = x
-                        #     y = unknown_header_s1[1] - somme(unknown_header_s1[2:]) - (b-a)
-                        #     unknown_header_s1.insert(2, y)
-
-                        #     print(unknown_header_s1)
-                        #     file.seek(b)
-                        #     for l in ((unknown_header_s1)[2:]):
-                        #         payload_field = file.read(l)
-                        #         payload_s1.append(payload_field)
-
-                        #     for n,i in enumerate(fields_regex_s1[1]):
-                        #         if i == 'zero':
-                        #             try:
-                        #                 payload_s1[n] = unknown_header_s1[1]
-                        #             except IndexError:
-                        #                 pass
-                        #         elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-                        #             payload_s1[n] = int.from_bytes(payload_s1[n], byteorder='big', signed=True)
-                        #             try:
-                        #                 if unknown_header_2_s1[2+n] == 8:
-                        #                     payload_s1[n] = 0
-                        #                 elif unknown_header_2_s1[2+n] == 9:
-                        #                     payload_s1[n] = 1
-                        #             except IndexError:
-                        #                 pass
-                        #         else:
-                        #                payload_s1[n] = payload_s1[n].decode('utf-8', errors='ignore')
-                        #                payload_s1[n] = payload_s1[n].replace("'", " ")
-
-                        #     record_infos_s1 = 'scenario 1, offset: ' + str(a)
-                        #     payload_s1.insert(0, record_infos_s1)
-
-                        #     for element in payload_s1:
-                        #         if isinstance(element, bytes):
-                        #             index = payload_s1.index(element)
-                        #             payload_s1.remove(element)
-                        #             payload_s1.insert(index, 'error')
-
-                        #     connection = sqlite3.connect('output.db')
-                        #     cursor = connection.cursor()
-                        #     statement_s1 = "INSERT INTO" + " " + table_s1 + str(tuple(fields_regex_s1[0])) + " VALUES " + str(tuple(payload_s1))
-                        #     cursor.execute(statement_s1)
-                        #     connection.commit()
-                        #     connection.close()
-                            
-                        #     print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
 
 
                     elif (fields_regex_s1[1])[0] == 'zero':
@@ -830,50 +789,11 @@ with open('20MinDatabase.db', 'r+b') as file:
                             x = 0
                             #Insert it on third place on header because it's type1 after freeblock
                             unknown_header_s1.insert(2, x)   
-                            file.seek(b)
-                            for l in ((unknown_header_s1)[2:]):
-                                payload_field = file.read(l)
-                                payload_s1.append(payload_field)
-                    
-           
-                            for n,i in enumerate(fields_regex_s1[1]):
-                                if i == 'zero':
-                                    try:
-                                        payload_s1[n] = unknown_header_s1[1]
-                                    except IndexError:
-                                        pass
-                                elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-                                    payload_s1[n] = int.from_bytes(payload_s1[n], byteorder='big', signed=True)
-                                    try:
-                                        if unknown_header_2_s1[2+n] == 8:
-                                            payload_s1[n] = 0
-                                        elif unknown_header_2_s1[2+n] == 9:
-                                            payload_s1[n] = 1
-                                    except IndexError:
-                                        pass
-                                else:
-                                    payload_s1[n] = payload_s1[n].decode('utf-8', errors='ignore')
-                                    payload_s1[n] = payload_s1[n].replace("'", " ")
 
-                            record_infos_s1 = 'scenario 1, offset: ' + str(a)
-                            payload_s1.insert(0, record_infos_s1)
-                            
-                            for element in payload_s1:
-                                if isinstance(element, bytes):
-                                    index = payload_s1.index(element)
-                                    payload_s1.remove(element)
-                                    payload_s1.insert(index, 'error')
-                               
-
-                            connection = sqlite3.connect('output.db')
-                            cursor = connection.cursor()
-                            statement_s1 = "INSERT INTO" + " " + table_s1 + str(tuple(fields_regex_s1[0])) + " VALUES " + str(tuple(payload_s1))
-                            cursor.execute(statement_s1)
-                            connection.commit()
-                            connection.close()
-                            
+                            record_infos = 'scenario 1, offset: ' + str(a)
+                            decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
                             print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
-
+                            
 
 
 
@@ -892,7 +812,7 @@ with open('20MinDatabase.db', 'r+b') as file:
                 b = match_s2.end()
                 file.seek(a)
 
-                decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, freeblock=True)
+                decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, scenario=2, freeblock=True)
                 
                 if not limit_s2:
                     pass
@@ -902,48 +822,40 @@ with open('20MinDatabase.db', 'r+b') as file:
                     #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
                     if (((somme(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((somme(unknown_header_s2[2:]) != 0))):
 
-                        file.seek(b)
-                        for l in ((unknown_header_s2)[2:]):
-                            payload_field = file.read(l)
-                            payload_s2.append(payload_field)
-
-                        for n,i in enumerate(fields_regex_s2[1]):
-                            if i == 'zero':
-                                try:
-                                    payload_s2[n] = 'unrecovered'
-                                except IndexError:
-                                    pass
-                            elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-                                payload_s2[n] = int.from_bytes(payload_s2[n], byteorder='big', signed=True)
-                                try:
-                                    if unknown_header_2_s2[2+n] == 8:
-                                        payload_s2[n] = 0
-                                    elif unknown_header_2_s2[2+n] == 9:
-                                        payload_s2[n] = 1
-                                except IndexError:
-                                    pass
-                            else:
-                                payload_s2[n] = payload_s2[n].decode('utf-8', errors='ignore')
-                                payload_s2[n] = payload_s2[n].replace("'", " ")
-
-                        record_infos_s2 = 'scenario 2, offset: ' + str(a)
-                        payload_s2.insert(0, record_infos_s2)
-
-                        for element in payload_s2:
-                            if isinstance(element, bytes):
-                                index = payload_s2.index(element)
-                                payload_s2.remove(element)
-                                payload_s2.insert(index, 'error')
-
-                        connection = sqlite3.connect('output.db')
-                        cursor = connection.cursor()
-                        statement_s2 = "INSERT INTO" + " " + table_s2 + str(tuple(fields_regex_s2[0])) + " VALUES " + str(tuple(payload_s2))
-                        cursor.execute(statement_s2)
-                        connection.commit()
-                        connection.close()
-
+                        record_infos = 'scenario 2, offset: ' + str(a)
+                        decode_record(table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
                         print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
 
+
+
+
+
+    """SCENARIO 3 : overwritten : payload length, rowid --> start at serial types array length"""
+    #As for scenario 0
+    for table_regex_s3 in tables_regexes_s3:
+        for table_s3, fields_regex_s3 in table_regex_s3.items():
+            fields_regex_s3[0].insert(0, 'record_infos')
+            for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True):
+                
+                unknown_header_s3 = []
+                unknown_header_2_s3 = []
+                limit_s3 = []
+                a = match_s3.start()
+                b = match_s3.end()
+                file.seek(a)
+                
+                decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, scenario=3, freeblock=True)
+
+                if not limit_s3:
+                    pass
+                else:
+                    payload_s3 = []
+                    #WARNING: false positives with 1 and 2-columns headers that can easily match
+                    #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
+                    if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
+                        record_infos = 'scenario 3, offset: ' + str(a)
+                        decode_record(table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
+                        print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
 
 #Close db file
 file.close()

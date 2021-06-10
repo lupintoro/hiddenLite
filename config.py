@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import os, sys, struct, sqlite3, json, mmap
+import argparse, os, sys, struct, sqlite3, json, mmap
 import regex as re
 
 
@@ -202,10 +202,27 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
     return unknown_header, limit
 
 
+#Create new db if already exists
+counter = 0     
+while os.path.exists("output%s.db" % counter):
+    counter+=1
+output_db = "output%s.db" % counter
+
+
+#Create new db if already exists
+count = 0             
+while os.path.exists("config%s.json" % count):
+    count+=1
+output_config = "config%s.json" % count
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('filename')
+args = parser.parse_args()
 
 #Open db file to add to config.py
-with open('20MinDatabase.db', 'r+b') as file:
-    size = os.path.getsize('20MinDatabase.db')
+with open(args.filename, 'r+b') as file:
+    size = os.path.getsize(args.filename)
     
     file.seek(0)
 
@@ -216,11 +233,11 @@ with open('20MinDatabase.db', 'r+b') as file:
         print("Not a sqlite 3 database")
     
     else:
-
         file.read(1)
         
         db_infos = {}
         db_info = []
+        db_infos["output db"] = output_db
         #Retrieve all header information and put it into list then into dict
         page_size = int(struct.unpack('>H', file.read(2))[0]) #here x10 x00 = 4096
         db_infos["page size"] = page_size
@@ -342,22 +359,22 @@ with open('20MinDatabase.db', 'r+b') as file:
                     parts = payload2[4].partition('(')
                     payload2[4] = ''.join(parts[:2]) + 'record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT,' + parts[2]
 
-                    #print(payload2[4])
+
                     #Create same DB but empty to write output in
-                    conn = sqlite3.connect('output.db')
+                    conn = sqlite3.connect(output_db)
+
                     try:
                         conn.execute(payload2[4])
                         # pragma = 'PRAGMA ignore_check_constraints = True'
                         # conn.execute(pragma)
                     except:
                         pass
-                        #print('Problem ' + payload2[4])
+                        print('Problem ' + payload2[4])
                     conn.close()
 
 
 
                 if payload[0] == 'table':
-                    #print(payload, '\n\n')
                     #Continue completing config.json with table/fields information
                     table_name = payload[1]
                     fields = payload[4].split('(',1)[1]
@@ -459,7 +476,7 @@ with open('20MinDatabase.db', 'r+b') as file:
                         config.append(fields_lists)
 
                     #Write config array in a json file
-                    with open ('config.json', 'w') as config_file:
+                    with open (output_config, 'w') as config_file:
                         json.dump(config, config_file, indent=2)
 
 
