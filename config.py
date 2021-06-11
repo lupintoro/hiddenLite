@@ -322,21 +322,25 @@ with open(args.filename, 'r+b') as file:
                     payload2.append(payload_field)
 
 
-                if payload2[0] == 'table' and ('CREATE TABLE' or 'create table' in payload2[4]):
+                if payload2[0] == 'table' and ('CREATE TABLE' or 'create table' in payload2[4]) and ('sqlite_' not in payload2[4]):
 
-                    if payload2[1] == 'sqlite_sequence':
-                        payload2[1] = 'sequence_copy'
-                        payload2[2] = 'sequence_copy'
-                        payload2[4] = 'CREATE TABLE sequence_copy(name TEXT NOT NULL,seq INT NOT NULL)'
+                    # if payload2[1] == 'sqlite_sequence':
+                    #     payload2[1] = 'sequence_copy'
+                    #     payload2[2] = 'sequence_copy'
+                    #     payload2[4] = 'CREATE TABLE sequence_copy(name TEXT NOT NULL,seq INT NOT NULL)'
 
 
                     
                     payload2[4] = payload2[4].replace('\n\t', '')
                     payload2[4] = payload2[4].replace('\n', '')
-                    payload2[4] = re.sub(r'(, PRIMARY KEY){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(,PRIMARY KEY){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(, UNIQUE){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(, PRIMARY KEY){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(, PRIMARY KEY ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(,PRIMARY KEY){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(,PRIMARY KEY ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(, UNIQUE ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(, UNIQUE){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = re.sub(r'(,UNIQUE){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(,UNIQUE ){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
                     #payload2[4] = re.sub(r'(,{1}.+PRIMARY KEY{1})', '', payload2[4], flags=re.IGNORECASE)
                     #payload2[4] = re.sub(r'(,{1}.+\({1}.+\){1})', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = payload2[4].replace(' UNIQUE', '')
@@ -360,6 +364,12 @@ with open(args.filename, 'r+b') as file:
                     payload2[4] = payload2[4].replace(' references', '')
                     payload2[4] = payload2[4].replace(' constraint', '')
                     payload2[4] = payload2[4].replace(' foreign key', '')
+                    payload2[4] = payload2[4].replace(' (rowid)', '')
+                    payload2[4] = payload2[4].replace(' (ROWID)', '')
+                    payload2[4] = payload2[4].replace(' ON DELETE', '')
+                    payload2[4] = payload2[4].replace(' on delete', '')
+                    payload2[4] = payload2[4].replace(' CASCADE', '')
+                    payload2[4] = payload2[4].replace(' cascade', '')
 
                     parts = payload2[4].partition('(')
                     payload2[4] = ''.join(parts[:2]) + 'record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT,' + parts[2]
@@ -373,13 +383,13 @@ with open(args.filename, 'r+b') as file:
                         # pragma = 'PRAGMA ignore_check_constraints = True'
                         # conn.execute(pragma)
                     except:
-                        pass
-                        #print('Problem ' + payload2[4])
+                        #pass
+                        print('Problem ' + payload2[4])
                     conn.close()
 
 
 
-                if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]):
+                if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]) and ('sqlite_' not in payload[4]):
                     #Continue completing config.json with table/fields information
                     table_name = payload[1]
                     fields = payload[4].split('(',1)[1]
@@ -447,13 +457,13 @@ with open(args.filename, 'r+b') as file:
                         name_ = _name_[0]
                         type_ = _name_[2]
 
-                        if table_name == 'sqlite_sequence':
-                            table_name = table_name.replace('sqlite_sequence', 'sequence_copy')
-                            if name_ == 'name':
-                                type_ = type_.replace(type_, 'TEXT NOT NULL')
-                        if table_name == 'sequence_copy':
-                            if name_ == 'seq':
-                                type_ = type_.replace(type_, 'INT NOT NULL')
+                        # if table_name == 'sqlite_sequence':
+                        #     table_name = table_name.replace('sqlite_sequence', 'sequence_copy')
+                        #     if name_ == 'name':
+                        #         type_ = type_.replace(type_, 'TEXT NOT NULL')
+                        # if table_name == 'sequence_copy':
+                        #     if name_ == 'seq':
+                        #         type_ = type_.replace(type_, 'INT NOT NULL')
                         
                         if name_.startswith("'") and name_.endswith("'"):
                             name_ = name_[1:-1]
