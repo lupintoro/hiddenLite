@@ -329,14 +329,16 @@ with open(args.filename, 'r+b') as file:
                         payload2[2] = 'sequence_copy'
                         payload2[4] = 'CREATE TABLE sequence_copy(name TEXT NOT NULL,seq INT NOT NULL)'
 
-                    payload2[4] = payload2[4].replace(' UNIQUE', '')
-                    payload2[4] = payload2[4].replace(' unique', '')
+
                     payload2[4] = payload2[4].replace('\n\t', '')
                     payload2[4] = payload2[4].replace('\n', '')
                     payload2[4] = re.sub(r'(, PRIMARY KEY){1}( )*\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = re.sub(r'(,PRIMARY KEY){1}( )*\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = re.sub(r'(,{1}.+PRIMARY KEY{1}.*\({1}.+)', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = re.sub(r'(,{1}.+\({1}.+\){1})', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(, UNIQUE){1}( )*\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(,UNIQUE){1}( )*\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
+                    payload2[4] = re.sub(r'(,{1}.+UNIQUE{1}.*\({1}.+)', ')', payload2[4], flags=re.IGNORECASE)
                     payload2[4] = payload2[4].replace(' ASC', '')
                     payload2[4] = payload2[4].replace(' DESC', '')
                     payload2[4] = payload2[4].replace(' asc', '')
