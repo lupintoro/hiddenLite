@@ -587,8 +587,11 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
             except IndexError:
                 pass
         else:
-            payload[n] = payload[n].decode('utf-8', errors='ignore')
-            payload[n] = payload[n].replace("'", " ")
+            try:
+                payload[n] = payload[n].decode('utf-8', errors='ignore')
+                payload[n] = payload[n].replace("'", " ")
+            except IndexError:
+                pass
 
 
     if (len(unknown_header) > 3) and (unknown_header[3] == 0):
