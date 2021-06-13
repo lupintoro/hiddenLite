@@ -607,8 +607,14 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
 
     connection = sqlite3.connect(output_db)
     cursor = connection.cursor()
+    
     statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
-    cursor.execute(statement)
+    
+    if len(fields_regex[0]) == len(payload):
+        cursor.execute(statement)
+    else:
+        print('The number of values ​​to insert is not equal to the number of columns : ', statement)
+    
     connection.commit()
     connection.close()
 
