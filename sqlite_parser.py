@@ -611,7 +611,10 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
     statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
     
     if len(fields_regex[0]) == len(payload):
-        cursor.execute(statement)
+        try:
+            cursor.execute(statement)
+        except:
+            print('Exception : ', statement)
     else:
         print('The number of values ​​to insert is not equal to the number of columns : ', statement)
     
@@ -751,7 +754,7 @@ with open(args.main_file, 'r+b') as file:
                         record_infos = 'scenario 0, offset: ' + str(a)
                         decode_record(table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                         
-                        print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
+                        #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
 
 
 
@@ -789,7 +792,7 @@ with open(args.main_file, 'r+b') as file:
 
                             record_infos = 'scenario 1, offset: ' + str(a)
                             decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
-                            print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
+                            #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
 
 
                     elif (fields_regex_s1[1])[0] == 'zero':
@@ -801,7 +804,7 @@ with open(args.main_file, 'r+b') as file:
 
                             record_infos = 'scenario 1, offset: ' + str(a)
                             decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
-                            print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
+                            #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
                             
 
 
@@ -833,7 +836,7 @@ with open(args.main_file, 'r+b') as file:
 
                         record_infos = 'scenario 2, offset: ' + str(a)
                         decode_record(table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
-                        print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
+                        #print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
 
 
 
@@ -864,7 +867,7 @@ with open(args.main_file, 'r+b') as file:
                     if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
                         record_infos = 'scenario 3, offset: ' + str(a)
                         decode_record(table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
-                        print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
+                        #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
 
 #Close db file
 file.close()

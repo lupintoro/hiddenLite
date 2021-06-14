@@ -384,7 +384,7 @@ with open(args.filename, 'r+b') as file:
                         # conn.execute(pragma)
                     except:
                         #pass
-                        print('Problem ' + payload2[4])
+                        print('Problem ' + payload2[4] + '\n')
                     conn.close()
 
 
