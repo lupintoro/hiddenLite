@@ -578,7 +578,10 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
             except IndexError:
                 pass
         elif i == 'boolean' or i == 'boolean_not_null' or i == 'integer' or i == 'integer_not_null':
-            payload[n] = int.from_bytes(payload[n], byteorder='big', signed=True)
+            try:
+                payload[n] = int.from_bytes(payload[n], byteorder='big', signed=True)
+            except IndexError:
+                pass
             try:
                 if unknown_header_2[z+n] == 8:
                     payload[n] = 0

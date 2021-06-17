@@ -372,7 +372,7 @@ with open(args.filename, 'r+b') as file:
                     payload2[4] = payload2[4].replace(' cascade', '')
 
                     parts = payload2[4].partition('(')
-                    payload2[4] = ''.join(parts[:2]) + 'record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT,' + parts[2]
+                    payload2[4] = ''.join(parts[:2]) + 'record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ' + parts[2]
 
 
                     #Create same DB but empty to write output in
@@ -380,11 +380,12 @@ with open(args.filename, 'r+b') as file:
 
                     try:
                         conn.execute(payload2[4])
+                        #print(payload2[4] + '\n')
                         # pragma = 'PRAGMA ignore_check_constraints = True'
                         # conn.execute(pragma)
                     except:
-                        #pass
-                        print('Problem ' + payload2[4] + '\n')
+                        pass
+                        #print('Problem ' + payload2[4] + '\n')
                     conn.close()
 
 
