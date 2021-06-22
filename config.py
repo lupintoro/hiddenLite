@@ -1,8 +1,13 @@
 #!/usr/bin/python3
-import argparse, os, sys, struct, sqlite3, json, mmap
+import argparse, os, sys, struct, sqlite3, json, mmap, itertools
 import regex as re
 
 
+types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT|DATE)(?!.*NO.*NULL))':'INTEGER', '((INT|DATE)(.*NO.*NULL))':'INTEGER NOT NULL', 
+'(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'TEXT', 
+'((CHAR|TEXT|CLOB)(.*NO.*NULL))':'TEXT NOT NULL', '(BLOB(?!.*NO.*NULL))':'BLOB', '(BLOB.*NO.*NULL)':'BLOB NOT NULL',
+'((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'REAL', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'REAL NOT NULL', 
+'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL))':'NUMERIC', '((NUMERIC|JSON|GUID|UUID)(.*NO.*NULL))':'NUMERIC NOT NULL'}
 
 
 #To sum elements in list
@@ -303,7 +308,6 @@ with open(args.filename, 'r+b') as file:
             
 
             payload = []
-            payload2 = []
             #Filter: if we have at least a payload length, rowid, types length and 1 type AND that payload length = sum of types and serial types array AND types not all = 0
             if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
                 #Go to the end of the match to start reading payload content
@@ -319,74 +323,6 @@ with open(args.filename, 'r+b') as file:
                         payload_field = payload_field
                     #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
                     payload.append(payload_field)
-                    payload2.append(payload_field)
-
-
-                if payload2[0] == 'table' and ('CREATE TABLE' or 'create table' in payload2[4]) and ('sqlite_' not in payload2[4]):
-
-                    # if payload2[1] == 'sqlite_sequence':
-                    #     payload2[1] = 'sequence_copy'
-                    #     payload2[2] = 'sequence_copy'
-                    #     payload2[4] = 'CREATE TABLE sequence_copy(name TEXT NOT NULL,seq INT NOT NULL)'
-
-
-                    
-                    payload2[4] = payload2[4].replace('\n\t', '')
-                    payload2[4] = payload2[4].replace('\n', '')
-                    payload2[4] = re.sub(r'(, PRIMARY KEY){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(, PRIMARY KEY ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(,PRIMARY KEY){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(,PRIMARY KEY ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(, UNIQUE ){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(, UNIQUE){1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(,UNIQUE){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = re.sub(r'(,UNIQUE ){1} {0,1}\({1}.+', ')', payload2[4], flags=re.IGNORECASE)
-                    #payload2[4] = re.sub(r'(,{1}.+PRIMARY KEY{1})', '', payload2[4], flags=re.IGNORECASE)
-                    #payload2[4] = re.sub(r'(,{1}.+\({1}.+\){1})', ')', payload2[4], flags=re.IGNORECASE)
-                    payload2[4] = payload2[4].replace(' UNIQUE', '')
-                    payload2[4] = payload2[4].replace(' unique', '')
-                    payload2[4] = payload2[4].replace(' ASC', '')
-                    payload2[4] = payload2[4].replace(' DESC', '')
-                    payload2[4] = payload2[4].replace(' asc', '')
-                    payload2[4] = payload2[4].replace(' desc', '')
-                    payload2[4] = payload2[4].replace(' COLLATE', '')
-                    payload2[4] = payload2[4].replace(' collate', '')
-                    payload2[4] = payload2[4].replace(' NOCASE', '')
-                    payload2[4] = payload2[4].replace(' nocase', '')
-                    payload2[4] = payload2[4].replace(' PRIMARY KEY', '')
-                    payload2[4] = payload2[4].replace(' primary key', '')
-                    payload2[4] = payload2[4].replace(' AUTOINCREMENT', '')
-                    payload2[4] = payload2[4].replace(' REFERENCES', '')
-                    payload2[4] = payload2[4].replace(' CONSTRAINT', '')
-                    payload2[4] = payload2[4].replace(' FOREIGN KEY', '')
-                    payload2[4] = payload2[4].replace(' primary key', '')
-                    payload2[4] = payload2[4].replace(' autoincrement', '')
-                    payload2[4] = payload2[4].replace(' references', '')
-                    payload2[4] = payload2[4].replace(' constraint', '')
-                    payload2[4] = payload2[4].replace(' foreign key', '')
-                    payload2[4] = payload2[4].replace(' (rowid)', '')
-                    payload2[4] = payload2[4].replace(' (ROWID)', '')
-                    payload2[4] = payload2[4].replace(' ON DELETE', '')
-                    payload2[4] = payload2[4].replace(' on delete', '')
-                    payload2[4] = payload2[4].replace(' CASCADE', '')
-                    payload2[4] = payload2[4].replace(' cascade', '')
-
-                    parts = payload2[4].partition('(')
-                    payload2[4] = ''.join(parts[:2]) + 'record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ' + parts[2]
-
-
-                    #Create same DB but empty to write output in
-                    conn = sqlite3.connect(output_db)
-
-                    try:
-                        conn.execute(payload2[4])
-                        #print(payload2[4] + '\n')
-                        # pragma = 'PRAGMA ignore_check_constraints = True'
-                        # conn.execute(pragma)
-                    except:
-                        pass
-                        #print('Problem ' + payload2[4] + '\n')
-                    conn.close()
 
 
 
@@ -411,18 +347,20 @@ with open(args.filename, 'r+b') as file:
                     fields = re.sub(r'(PRIMARY KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(UNIQUE){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(FOREIGN KEY){1}( )*\({1}.+', '', fields)
+                    fields = re.sub(r'(CHECK){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(REFERENCES ){1}.*', '', fields)
                     fields = re.sub(r'(CONSTRAINT ){1}.*', '', fields)
 
 
                     if fields.endswith(','):
-                        fields = fields[:-1]   
+                        fields = fields[:-1]
 
                     #Fields are separated by commas
                     fields = fields.split(',')
 
                     #Put table name and each associated field in same list
-                    field_list = []
+                    field_list_config = []
+                    #field_list_output = ['record_id', 'INTEGER PRIMARY KEY AUTOINCREMENT', 'record_infos', 'TEXT']
                     
 
                     #Make a dictionary for each field, name:type
@@ -458,13 +396,6 @@ with open(args.filename, 'r+b') as file:
                         name_ = _name_[0]
                         type_ = _name_[2]
 
-                        # if table_name == 'sqlite_sequence':
-                        #     table_name = table_name.replace('sqlite_sequence', 'sequence_copy')
-                        #     if name_ == 'name':
-                        #         type_ = type_.replace(type_, 'TEXT NOT NULL')
-                        # if table_name == 'sequence_copy':
-                        #     if name_ == 'seq':
-                        #         type_ = type_.replace(type_, 'INT NOT NULL')
                         
                         if name_.startswith("'") and name_.endswith("'"):
                             name_ = name_[1:-1]
@@ -481,20 +412,77 @@ with open(args.filename, 'r+b') as file:
                         if (name_ == '' and type_ == '') or (name_ == "\n" and type_ == "") or (name_ == "" and type_ == " ") or (name_ == "" and type_ == "  "):
                             pass
                         else:
-                            field_list.append(name_)
-                            field_list.append(type_)
-                    dict_transf = {field_list[i]: field_list[i + 1] for i in range(0, len(field_list), 2)}
+                            if type_ == '':
+                                type_ = 'NUMERIC'
+                            for key,value in types_affinities.items():
+                                type_ = re.sub(rf'.*{key}.*', value, type_, flags=re.IGNORECASE)
+                            
+                            field_list_config.append(name_)
+                            field_list_config.append(type_)
+                            
+                            # field_list_output.append(name_)
+                            # field_list_output.append(type_)
+                    
+
+                    
+                    dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
+                    # dict_transf_output = {field_list_output[i]: field_list_output[i + 1] for i in range(0, len(field_list_output), 2)}
+                    
                    
-                    fields_lists = {table_name:dict_transf}
+                    fields_lists_config = {table_name:dict_transf_config}
+                    #fields_lists_output = {table_name:dict_transf_output}
+                    
                     
                     #Append list with table_name, fields to config file
-                    if fields_lists not in config:
-                        config.append(fields_lists)
+                    if fields_lists_config not in config:
+                        config.append(fields_lists_config)
 
-                    #Write config array in a json file
-                    with open (output_config, 'w') as config_file:
-                        json.dump(config, config_file, indent=2)
 
+        keys_copies = {}
+        for a,b in itertools.combinations(config[1:],2):
+            if a.keys() == b.keys():
+                for key,value in b.items():
+                    element = str(key) + '_copy'
+                    keys_copies[key] = element
+        
+        for a,b in itertools.combinations(config[1:],2):
+            if a.keys() == b.keys():
+                for key,value in keys_copies.items():
+                    for key1,value1 in b.copy().items():
+                        if key == key1:
+                            b[value] = b[key1]
+                            del b[key]
+
+
+        #Write config array in a json file
+        with open (output_config, 'w') as config_file:
+            json.dump(config, config_file, indent=2)
+
+                    
+        for element in config[1:]:
+            for key,value in element.items():
+                statement = json.dumps(value)
+                statement = statement.replace('}', ')')
+                statement = statement.replace('"', '')
+                statement = statement.replace(':', '')
+                statement = statement.replace('INTEGER PRIMARY KEY', 'INTEGER') #TODO: verify
+                statement = statement.replace('{', '(record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ')
+                
+                final_statement = 'CREATE TABLE ' + key + ' ' + statement
+            
+            #Create same DB but empty to write output in
+            conn = sqlite3.connect(output_db)
+
+            try:
+                conn.execute(final_statement)
+                #print(payload2[4] + '\n')
+                # pragma = 'PRAGMA ignore_check_constraints = True'
+                # conn.execute(pragma)
+            except:
+                pass
+                #print('Problem ' + final_statement + '\n')
+            conn.close()
+        config_file.close()
 
 #Close the db file
 file.close()
