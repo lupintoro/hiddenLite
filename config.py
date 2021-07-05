@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import argparse, os, sys, struct, sqlite3, json, mmap, itertools
+import argparse, os, sys, struct, sqlite3, json, mmap, itertools, copy
 import regex as re
 
 
@@ -329,15 +329,46 @@ with open(args.filename, 'r+b') as file:
                 if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]) and ('sqlite_' not in payload[4]):
                     #Continue completing config.json with table/fields information
                     table_name = payload[1]
-                    fields = payload[4].split('(',1)[1]
+                    #Corpus 01-18.db
+                    for i in table_name:
+                        if ord(i) <= 20:
+                            table_name = table_name.replace(i, 'character_before_20')
+                    #Corpus 01-13.db
+                    if payload[1] == 40:
+                        fields = payload[4].split('(',2)[2]
+                    else:
+                        fields = payload[4].split('(',1)[1]
 
+                    #Corpus 01-all special characters cases
+                    if type(table_name) == int:
+                        table_name = 'special_character_' + str(table_name)
 
                     #Clean table name
+                    if table_name.startswith("'") and table_name.endswith("'"):
+                        table_name = table_name[1:-1]
+                        #Corpus 01-01.db
+                        if table_name == '':
+                            table_name = '\'\''
                     if table_name.startswith('"') and table_name.endswith('"'):
                         table_name = table_name[1:-1]
+                        #Corpus 01-01.db
+                        if table_name == '':
+                            table_name = '\"\"'
                     if table_name.startswith('[') and table_name.endswith(']'):
                         table_name = table_name[1:-1]
+                        #Corpus 01-01.db
+                        if table_name == '':
+                            table_name = '[]'
+                    
+                    #Corpus 01-02.db
+                    table_name = table_name.replace("'", "apostrophe_exception_name")
+                    table_name = table_name.replace('"', "quotation_exception_name")
+                    table_name = table_name.replace('--', "double_dash_exception_name")
+                    table_name = table_name.replace('%s', "parameterized_string_exception_name")
+                    if table_name == '':
+                        table_name = '\"\"'
 
+                    
                     #Clean fields
                     if fields.endswith(' )'):
                         fields = fields[:-2]
@@ -415,11 +446,15 @@ with open(args.filename, 'r+b') as file:
                             if type_ == '':
                                 type_ = 'NUMERIC'
                             for key,value in types_affinities.items():
-                                type_ = re.sub(rf'.*{key}.*', value, type_, flags=re.IGNORECASE)
-                            
+                                if 'DEFAULT' not in type_:
+                                    type_ = re.sub(rf'.*{key}.*', value, type_, flags=re.IGNORECASE)
+                                else:
+                                    type_ = re.sub(rf'.*{key}.*', value + ' DEFAULT 0', type_, flags=re.IGNORECASE)
+
                             field_list_config.append(name_)
                             field_list_config.append(type_)
-                            
+
+
                             # field_list_output.append(name_)
                             # field_list_output.append(type_)
                     
@@ -452,6 +487,31 @@ with open(args.filename, 'r+b') as file:
                         if key == key1:
                             b[value] = b[key1]
                             del b[key]
+
+
+        keys_default = {}
+
+        
+        for dictionaries in config[1:]:
+            for key2,value2 in dictionaries.items():
+                list_values = list(value2.values())
+                list_keys = list(value2.keys())
+
+                if 'DEFAULT' in list_values[-1] and len(list_values) > 5:
+                    default_dict = copy.deepcopy(dictionaries)
+                    for key,value in default_dict.items():
+                        value.pop(list_keys[-1])
+                        element = str(key) + '_default_0'
+                        keys_default[key] = element
+                    
+                    for key,value in default_dict.copy().items():
+                        for key1,value1 in keys_default.items():
+                            if key == key1:
+                                default_dict[value1] = default_dict[key]
+                                del default_dict[key]
+                    
+                    
+                    config.append(default_dict)
 
 
         #Write config array in a json file

@@ -593,6 +593,7 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
             try:
                 payload[n] = payload[n].decode('utf-8', errors='ignore')
                 payload[n] = payload[n].replace("'", " ")
+                payload[n] = payload[n].replace("--", "  ")
             except IndexError:
                 pass
 
@@ -617,10 +618,8 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
         try:
             cursor.execute(statement)
         except:
-            pass
             print('Exception : ', statement)
     else:
-        pass
         print('The number of values ​​to insert is not equal to the number of columns : ', statement)
     
     connection.commit()
