@@ -120,7 +120,10 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             #Replace each type with regex of type : e.g. ['INTEGER NOT NULL', 'INTEGER NOT NULL', 'LONGVARCHAR NOT NULL'] --> #e.g. ['integer', 'integer', 'text']
             fields_types_ = regex_types(fields_types_)
             if fields_types_ not in types_list:
-                fields_types_ = 'numeric'
+                if 'NOT NULL' in fields_types_:
+                    fields_types_ = 'numeric_not_null'
+                else:
+                    fields_types_ = 'numeric'
             #Add it to list header_pattern to create a header pattern
             header_pattern.append(fields_types_)
             j+=1
@@ -560,7 +563,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
 
 
 
-def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z):
+def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z):
     #Go to the end of the match to start reading payload content that comes just after header
     file.seek(b)
     #For each length of each type
@@ -612,13 +615,17 @@ def decode_record(table, b, payload, unknown_header, unknown_header_2, fields_re
     connection = sqlite3.connect(output_db)
     cursor = connection.cursor()
     
+
     statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
+    statement = statement.replace('[', '')
+    statement = statement.replace(']', '')
     
     if len(fields_regex[0]) == len(payload):
         try:
             cursor.execute(statement)
         except:
-            print('Exception : ', statement)
+            #print('Exception : ', statement)
+            pass
     else:
         print('The number of values ​​to insert is not equal to the number of columns : ', statement)
     
@@ -636,17 +643,44 @@ args = parser.parse_args()
 with open(args.config, 'r') as config_file:
     #Load content
     data = json.load(config_file)
+
     #Close file
     config_file.close()
+
+#Create new db if already exists
+for key,value in data[0].items():
+    if key == "file name":
+        output_db = 'output_' + value + '.db'
+
+                
+for element in data[1:]:
+    for key,value in element.items():
+        statement = json.dumps(value)
+        statement = statement.replace('}', ')')
+        statement = statement.replace('"', '')
+        statement = statement.replace(':', '')
+        statement = statement.replace('INTEGER PRIMARY KEY', 'INTEGER')
+        statement = statement.replace('{', '(record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ')
+        
+        final_statement = 'CREATE TABLE ' + key + ' ' + statement
+    
+    #Create same DB but empty to write output in
+    conn = sqlite3.connect(output_db)
+
+    try:
+        conn.execute(final_statement)
+        #print(payload2[4] + '\n')
+    except:
+        pass
+        #print('Problem ' + final_statement + '\n\n')
+    conn.close()
+
 
 fields_numbers = []
 fields_types = []
 tables_names = []
 fields_names = []
 
-for key,value in data[0].items():
-    if key == "output db":
-        output_db = value
 
 #TODO: read db_infos to retrieve db encoding (e.g. UTF-8)
 
@@ -756,7 +790,7 @@ with open(args.main_file, 'r+b') as file:
                     #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
                     if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
                         record_infos = 'scenario 0, offset: ' + str(a)
-                        decode_record(table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
+                        decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                         
                         #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
 
@@ -795,7 +829,7 @@ with open(args.main_file, 'r+b') as file:
                             unknown_header_s1.insert(2, x)
 
                             record_infos = 'scenario 1, offset: ' + str(a)
-                            decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                            decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
                             #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
 
 
@@ -807,7 +841,7 @@ with open(args.main_file, 'r+b') as file:
                             unknown_header_s1.insert(2, x)   
 
                             record_infos = 'scenario 1, offset: ' + str(a)
-                            decode_record(table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                            decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
                             #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
                             
 
@@ -839,7 +873,7 @@ with open(args.main_file, 'r+b') as file:
                     if (((somme(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((somme(unknown_header_s2[2:]) != 0))):
 
                         record_infos = 'scenario 2, offset: ' + str(a)
-                        decode_record(table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
+                        decode_record(output_db, table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
                         #print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
 
 
@@ -870,7 +904,7 @@ with open(args.main_file, 'r+b') as file:
                     #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
                     if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
                         record_infos = 'scenario 3, offset: ' + str(a)
-                        decode_record(table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
+                        decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
                         #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
 
 #Close db file

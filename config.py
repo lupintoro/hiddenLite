@@ -1,13 +1,18 @@
 #!/usr/bin/python3
 import argparse, os, sys, struct, sqlite3, json, mmap, itertools, copy
+from email.policy import default
+from tkinter import Y
 import regex as re
 
 
-types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT|DATE)(?!.*NO.*NULL))':'INTEGER', '((INT|DATE)(.*NO.*NULL))':'INTEGER NOT NULL', 
-'(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'TEXT', 
-'((CHAR|TEXT|CLOB)(.*NO.*NULL))':'TEXT NOT NULL', '(BLOB(?!.*NO.*NULL))':'BLOB', '(BLOB.*NO.*NULL)':'BLOB NOT NULL',
-'((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'REAL', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'REAL NOT NULL', 
-'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL))':'NUMERIC', '((NUMERIC|JSON|GUID|UUID)(.*NO.*NULL))':'NUMERIC NOT NULL'}
+types_list_2 = ['INTEGER PRIMARY KEY', 'INTEGER', 'INTEGER NOT NULL', 'BOOLEAN', 'BOOLEAN NOT NULL', 'REAL', 'REAL NOT NULL', 
+'TEXT', 'TEXT NOT NULL', 'NUMERIC', 'NUMERIC NOT NULL', 'BLOB', 'BLOB NOT NULL']
+
+types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT|DATE)(?!.*NO.*NULL)(?!.*PRIMARY.*KEY))':'INTEGER', 
+'((INT|DATE)(.*NO.*NULL))':'INTEGER NOT NULL', '(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', 
+'((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'TEXT', '((CHAR|TEXT|CLOB)(.*NO.*NULL))':'TEXT NOT NULL', '(BLOB(?!.*NO.*NULL))':'BLOB', 
+'(BLOB.*NO.*NULL)':'BLOB NOT NULL', '((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'REAL', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'REAL NOT NULL', 
+'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL))':'NUMERIC', '((NUMERIC|JSON)(.*NO.*NULL))':'NUMERIC NOT NULL'}
 
 
 #To sum elements in list
@@ -207,18 +212,28 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
     return unknown_header, limit
 
 
-#Create new db if already exists
-counter = 0     
-while os.path.exists("output%s.db" % counter):
-    counter+=1
-output_db = "output%s.db" % counter
 
+def default_table(dictionary, name):
+    for dictionaries in dictionary:
+        for key2,value2 in dictionaries.items():
+            list_values = list(value2.values())
+            list_keys = list(value2.keys())
 
-#Create new db if already exists
-count = 0             
-while os.path.exists("config%s.json" % count):
-    count+=1
-output_config = "config%s.json" % count
+            if 'DEFAULT' in list_values[-1] and len(list_values) > 5:
+                default_dict = copy.deepcopy(dictionaries)
+                for key,value in default_dict.items():
+                    value.pop(list_keys[-1])
+                    element = str(key) + str(name)
+                    keys_default[key] = element
+                
+                for key,value in default_dict.copy().items():
+                    for key1,value1 in keys_default.items():
+                        if key == key1:
+                            default_dict[value1] = default_dict[key]
+                            del default_dict[key]
+                
+                config.append(default_dict)
+         
 
 
 parser = argparse.ArgumentParser()
@@ -228,6 +243,7 @@ args = parser.parse_args()
 #Open db file to add to config.py
 with open(args.filename, 'r+b') as file:
     size = os.path.getsize(args.filename)
+    file_name = (os.path.splitext(args.filename))[0]
     
     file.seek(0)
 
@@ -242,7 +258,7 @@ with open(args.filename, 'r+b') as file:
         
         db_infos = {}
         db_info = []
-        db_infos["output db"] = output_db
+        db_infos["file name"] = file_name
         #Retrieve all header information and put it into list then into dict
         page_size = int(struct.unpack('>H', file.read(2))[0]) #here x10 x00 = 4096
         db_infos["page size"] = page_size
@@ -354,8 +370,8 @@ with open(args.filename, 'r+b') as file:
                         #Corpus 01-01.db
                         if table_name == '':
                             table_name = '\"\"'
-                    if table_name.startswith('[') and table_name.endswith(']'):
-                        table_name = table_name[1:-1]
+                    # if table_name.startswith('[') and table_name.endswith(']'):
+                    #     table_name = table_name[1:-1]
                         #Corpus 01-01.db
                         if table_name == '':
                             table_name = '[]'
@@ -391,8 +407,7 @@ with open(args.filename, 'r+b') as file:
 
                     #Put table name and each associated field in same list
                     field_list_config = []
-                    #field_list_output = ['record_id', 'INTEGER PRIMARY KEY AUTOINCREMENT', 'record_infos', 'TEXT']
-                    
+
 
                     #Make a dictionary for each field, name:type
                     #The type is one of the types in serial_types_list
@@ -432,12 +447,12 @@ with open(args.filename, 'r+b') as file:
                             name_ = name_[1:-1]
                         if name_.startswith('"') and name_.endswith('"'):
                             name_ = name_[1:-1]
-                        if name_.startswith('[') and name_.endswith(']'):
-                            name_ = name_[1:-1]
+                        # if name_.startswith('[') and name_.endswith(']'):
+                        #     name_ = name_[1:-1]
                         if name_.endswith(' "'):
                             name_ = name_[:-2]
-                        if name_.endswith('"') or name_.endswith(']'):
-                            name_ = name_[:-1]
+                        # if name_.endswith('"') or name_.endswith(']'):
+                        #     name_ = name_[:-1]
 
                                             
                         if (name_ == '' and type_ == '') or (name_ == "\n" and type_ == "") or (name_ == "" and type_ == " ") or (name_ == "" and type_ == "  "):
@@ -451,23 +466,20 @@ with open(args.filename, 'r+b') as file:
                                 else:
                                     type_ = re.sub(rf'.*{key}.*', value + ' DEFAULT 0', type_, flags=re.IGNORECASE)
 
+                            if type_ not in types_list_2 and 'DEFAULT' not in type_:
+                                if 'NOT NULL' in type_:
+                                    type_ = 'NUMERIC NOT NULL'
+                                else:
+                                    type_ = 'NUMERIC'
+                            
                             field_list_config.append(name_)
                             field_list_config.append(type_)
-
-
-                            # field_list_output.append(name_)
-                            # field_list_output.append(type_)
                     
-
                     
                     dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
-                    # dict_transf_output = {field_list_output[i]: field_list_output[i + 1] for i in range(0, len(field_list_output), 2)}
-                    
                    
                     fields_lists_config = {table_name:dict_transf_config}
-                    #fields_lists_output = {table_name:dict_transf_output}
-                    
-                    
+
                     #Append list with table_name, fields to config file
                     if fields_lists_config not in config:
                         config.append(fields_lists_config)
@@ -487,61 +499,36 @@ with open(args.filename, 'r+b') as file:
                         if key == key1:
                             b[value] = b[key1]
                             del b[key]
-
-
+        
         keys_default = {}
 
+
+        #Default case
+        name = 0
+        z = 1
+        x = len(config)
+        default_table(config[z:], name)
+        name+=1
+        default_table(config[x-z:], name)
         
-        for dictionaries in config[1:]:
-            for key2,value2 in dictionaries.items():
-                list_values = list(value2.values())
-                list_keys = list(value2.keys())
+        
+        while True:
+            name+=1
+            y = len(config)
+            default_table(config[y-z:], name)
+            w = len(config)
+            if w==y:
+                break
+            else:
+                continue
 
-                if 'DEFAULT' in list_values[-1] and len(list_values) > 5:
-                    default_dict = copy.deepcopy(dictionaries)
-                    for key,value in default_dict.items():
-                        value.pop(list_keys[-1])
-                        element = str(key) + '_default_0'
-                        keys_default[key] = element
-                    
-                    for key,value in default_dict.copy().items():
-                        for key1,value1 in keys_default.items():
-                            if key == key1:
-                                default_dict[value1] = default_dict[key]
-                                del default_dict[key]
-                    
-                    
-                    config.append(default_dict)
-
-
+        
+        #Create new db if already exists
+        output_config = "config_%s.json" % file_name
+        
         #Write config array in a json file
         with open (output_config, 'w') as config_file:
             json.dump(config, config_file, indent=2)
-
-                    
-        for element in config[1:]:
-            for key,value in element.items():
-                statement = json.dumps(value)
-                statement = statement.replace('}', ')')
-                statement = statement.replace('"', '')
-                statement = statement.replace(':', '')
-                statement = statement.replace('INTEGER PRIMARY KEY', 'INTEGER') #TODO: verify
-                statement = statement.replace('{', '(record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ')
-                
-                final_statement = 'CREATE TABLE ' + key + ' ' + statement
-            
-            #Create same DB but empty to write output in
-            conn = sqlite3.connect(output_db)
-
-            try:
-                conn.execute(final_statement)
-                #print(payload2[4] + '\n')
-                # pragma = 'PRAGMA ignore_check_constraints = True'
-                # conn.execute(pragma)
-            except:
-                pass
-                #print('Problem ' + final_statement + '\n')
-            conn.close()
         config_file.close()
 
 #Close the db file
