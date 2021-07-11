@@ -362,6 +362,8 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
     #Link together table name, table's fields and regex for that table
     for i in range(len(regex_constructs)):
         table_regex = {tables_names[i]:[lists_fields[i], headers_patterns_copy[i], regex_constructs[i]]}
+        for table, fields_regex in table_regex.items():
+            fields_regex[0].insert(0, 'record_infos')
         tables_regexes.append(table_regex)
 
     return tables_regexes
@@ -636,7 +638,7 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
 
 parser = argparse.ArgumentParser()
 parser.add_argument('config')
-parser.add_argument('main_file')
+parser.add_argument('main_file', nargs='+')
 args = parser.parse_args()
 
 #Open config file containing db infos, each table and type of column per table
@@ -752,160 +754,157 @@ build_regex(header_pattern_s3, headers_patterns_s3, list_fields_s3, lists_fields
 
 
 
+for mainfile in args.main_file:
 
-#Open db file (or other file) in binary format for reading
-with open(args.main_file, 'r+b') as file:
-    #mmap: instead of file.read() or file.readlines(), also works for big files, file content is internally loaded from disk as needed
-    mm = mmap.mmap(file.fileno(), 0)
-
-
-
-
-    """SCENARIO 0 : non-deleted records in db file (or records in journal/WAL files that keep same structure)"""
-    # For each regex of types per table : e.g. table urls regex.Regex(b'(([\x01-\x80]{1})|([\x81-\xff]{1}[\x00-\x80]{1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{0,1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{1}))[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}(([\x08]|[\x09]){1})(([\x08]|[\x09]){1})', flags=regex.A | regex.V0)
-    for table_regex in tables_regexes:
-        for table, fields_regex in table_regex.items():
-            fields_regex[0].insert(0, 'record_infos')
-            # Iterate over the file (mm) and search for a match
-            # Update regex module : regex 2021.4.4 : overlapped=True finds overlapping matches (match starting at an offset inside another match)
-            for match in re.finditer(fields_regex[2], mm, overlapped=True):
-                unknown_header = []
-                unknown_header_2 = []
-                limit = []
-                a = match.start()
-                b = match.end()
-
-                #Go to start of the match
-                file.seek(a)
-
-                #Decode unknown header bytes-->integers
-                decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, scenario=0, freeblock=False)
-
-                #If limit is an empty list, header only contains start of header and is therefore a non-valid header
-                if not limit:
-                    pass
-                #Else: may be a valid header
-                else:
-                    payload = []
-                    #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
-                    if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
-                        record_infos = 'scenario 0, offset: ' + str(a)
-                        decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
-                        
-                        #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
+    #Open db file (or other file) in binary format for reading
+    with open(mainfile, 'r+b') as file:
+        #mmap: instead of file.read() or file.readlines(), also works for big files, file content is internally loaded from disk as needed
+        mm = mmap.mmap(file.fileno(), 0)
 
 
 
 
+        """SCENARIO 0 : non-deleted records in db file (or records in journal/WAL files that keep same structure)"""
+        # For each regex of types per table : e.g. table urls regex.Regex(b'(([\x01-\x80]{1})|([\x81-\xff]{1}[\x00-\x80]{1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{0,1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{1}))[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}(([\x08]|[\x09]){1})(([\x08]|[\x09]){1})', flags=regex.A | regex.V0)
+        for table_regex in tables_regexes:
+            for table, fields_regex in table_regex.items():
+                # Iterate over the file (mm) and search for a match
+                # Update regex module : regex 2021.4.4 : overlapped=True finds overlapping matches (match starting at an offset inside another match)
+                for match in re.finditer(fields_regex[2], mm, overlapped=True):
+                    unknown_header = []
+                    unknown_header_2 = []
+                    limit = []
+                    a = match.start()
+                    b = match.end()
 
-    """SCENARIO 1 : overwritten : payload length, rowid, serial types array length, type 1 --> start at type 2"""
-    #As for scenario 0
-    for table_regex_s1 in tables_regexes_s1:
-        for table_s1, fields_regex_s1 in table_regex_s1.items():
-            fields_regex_s1[0].insert(0, 'record_infos')
-            for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True):
-                unknown_header_s1 = []
-                unknown_header_2_s1 = []
-                limit_s1 = []
-                a = match_s1.start()
-                b = match_s1.end()
-                file.seek(a)
+                    #Go to start of the match
+                    file.seek(a)
 
-                decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, scenario=1, freeblock=True)
+                    #Decode unknown header bytes-->integers
+                    decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, scenario=0, freeblock=False)
 
-                if not limit_s1:
-                    pass
-                else:
-                    payload_s1 = []
-                    #Then we have to assume what type1 is
-                    #WARNING: more false positives because more options
-                    #WARNING: more duplicates if 2 or more tables with same number of columns --> will try for each type1
-                    #If type1 is an integer, then a number from 0-9 is missing on first position on the header
-                    if (fields_regex_s1[1])[0] == 'integer' or (fields_regex_s1[1])[0] == 'integer_not_null':
-                        if (((somme(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1] <= (somme(unknown_header_s1[2:]) + (b-a) + 9))): #and (len(unknown_header_s1) > 3) for less false positives, but we miss all 1 and 2 columns records
-                            #x is the unknown integer
-                            x = unknown_header_s1[1] - somme(unknown_header_s1[2:]) - (b-a)
-                            #Insert it on third place on header because it's type1 after freeblock
-                            unknown_header_s1.insert(2, x)
-
-                            record_infos = 'scenario 1, offset: ' + str(a)
-                            decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
-                            #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
-
-
-                    elif (fields_regex_s1[1])[0] == 'zero':
-                        if ((somme(unknown_header_s1[2:]) + (b-a)) == ((unknown_header_s1[1])-1)):
-                            #x is the unknown integer
-                            x = 0
-                            #Insert it on third place on header because it's type1 after freeblock
-                            unknown_header_s1.insert(2, x)   
-
-                            record_infos = 'scenario 1, offset: ' + str(a)
-                            decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
-                            #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
+                    #If limit is an empty list, header only contains start of header and is therefore a non-valid header
+                    if not limit:
+                        pass
+                    #Else: may be a valid header
+                    else:
+                        payload = []
+                        #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
+                        if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
+                            record_infos = 'scenario 0, offset: ' + str(a) + ' ' + str(mainfile)
+                            decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                             
-
-
-
-
-    """SCENARIO 2 : overwritten : payload length, rowid, serial types array length --> start at type 1"""
-    #As for scenario 0
-    for table_regex_s2 in tables_regexes_s2:
-        for table_s2, fields_regex_s2 in table_regex_s2.items():
-            fields_regex_s2[0].insert(0, 'record_infos')
-            for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True):
-                
-                unknown_header_s2 = []
-                unknown_header_2_s2 = []
-                limit_s2 = []
-                a = match_s2.start()
-                b = match_s2.end()
-                file.seek(a)
-
-                decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, scenario=2, freeblock=True)
-                
-                if not limit_s2:
-                    pass
-                else:
-                    payload_s2 = []
-                    #WARNING: false positives with 1 and 2-columns headers that can easily match
-                    #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
-                    if (((somme(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((somme(unknown_header_s2[2:]) != 0))):
-
-                        record_infos = 'scenario 2, offset: ' + str(a)
-                        decode_record(output_db, table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
-                        #print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
+                            #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
 
 
 
 
 
-    """SCENARIO 3 : overwritten : payload length, rowid --> start at serial types array length"""
-    #As for scenario 0
-    for table_regex_s3 in tables_regexes_s3:
-        for table_s3, fields_regex_s3 in table_regex_s3.items():
-            fields_regex_s3[0].insert(0, 'record_infos')
-            for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True):
-                
-                unknown_header_s3 = []
-                unknown_header_2_s3 = []
-                limit_s3 = []
-                a = match_s3.start()
-                b = match_s3.end()
-                file.seek(a)
-                
-                decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, scenario=3, freeblock=True)
+        """SCENARIO 1 : overwritten : payload length, rowid, serial types array length, type 1 --> start at type 2"""
+        #As for scenario 0
+        for table_regex_s1 in tables_regexes_s1:
+            for table_s1, fields_regex_s1 in table_regex_s1.items():
+                for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True):
+                    unknown_header_s1 = []
+                    unknown_header_2_s1 = []
+                    limit_s1 = []
+                    a = match_s1.start()
+                    b = match_s1.end()
+                    file.seek(a)
 
-                if not limit_s3:
-                    pass
-                else:
-                    payload_s3 = []
-                    #WARNING: false positives with 1 and 2-columns headers that can easily match
-                    #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
-                    if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
-                        record_infos = 'scenario 3, offset: ' + str(a)
-                        decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
-                        #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
+                    decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, scenario=1, freeblock=True)
 
-#Close db file
-file.close()
+                    if not limit_s1:
+                        pass
+                    else:
+                        payload_s1 = []
+                        #Then we have to assume what type1 is
+                        #WARNING: more false positives because more options
+                        #WARNING: more duplicates if 2 or more tables with same number of columns --> will try for each type1
+                        #If type1 is an integer, then a number from 0-9 is missing on first position on the header
+                        if (fields_regex_s1[1])[0] == 'integer' or (fields_regex_s1[1])[0] == 'integer_not_null':
+                            if (((somme(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1] <= (somme(unknown_header_s1[2:]) + (b-a) + 9))): #and (len(unknown_header_s1) > 3) for less false positives, but we miss all 1 and 2 columns records
+                                #x is the unknown integer
+                                x = unknown_header_s1[1] - somme(unknown_header_s1[2:]) - (b-a)
+                                #Insert it on third place on header because it's type1 after freeblock
+                                unknown_header_s1.insert(2, x)
+
+                                record_infos = 'scenario 1, offset: ' + str(a) + ' ' + str(mainfile)
+                                decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                                #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
+
+
+                        elif (fields_regex_s1[1])[0] == 'zero':
+                            if ((somme(unknown_header_s1[2:]) + (b-a)) == ((unknown_header_s1[1])-1)):
+                                #x is the unknown integer
+                                x = 0
+                                #Insert it on third place on header because it's type1 after freeblock
+                                unknown_header_s1.insert(2, x)   
+
+                                record_infos = 'scenario 1, offset: ' + str(a) + ' ' + str(mainfile)
+                                decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                                #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
+                                
+
+
+
+
+        """SCENARIO 2 : overwritten : payload length, rowid, serial types array length --> start at type 1"""
+        #As for scenario 0
+        for table_regex_s2 in tables_regexes_s2:
+            for table_s2, fields_regex_s2 in table_regex_s2.items():
+                for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True):
+                    
+                    unknown_header_s2 = []
+                    unknown_header_2_s2 = []
+                    limit_s2 = []
+                    a = match_s2.start()
+                    b = match_s2.end()
+                    file.seek(a)
+
+                    decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, scenario=2, freeblock=True)
+                    
+                    if not limit_s2:
+                        pass
+                    else:
+                        payload_s2 = []
+                        #WARNING: false positives with 1 and 2-columns headers that can easily match
+                        #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
+                        if (((somme(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((somme(unknown_header_s2[2:]) != 0))):
+
+                            record_infos = 'scenario 2, offset: ' + str(a) + ' ' + str(mainfile)
+                            decode_record(output_db, table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
+                            #print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
+
+
+
+
+
+        """SCENARIO 3 : overwritten : payload length, rowid --> start at serial types array length"""
+        #As for scenario 0
+        for table_regex_s3 in tables_regexes_s3:
+            for table_s3, fields_regex_s3 in table_regex_s3.items():
+                for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True):
+                    
+                    unknown_header_s3 = []
+                    unknown_header_2_s3 = []
+                    limit_s3 = []
+                    a = match_s3.start()
+                    b = match_s3.end()
+                    file.seek(a)
+                    
+                    decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, scenario=3, freeblock=True)
+
+                    if not limit_s3:
+                        pass
+                    else:
+                        payload_s3 = []
+                        #WARNING: false positives with 1 and 2-columns headers that can easily match
+                        #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
+                        if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
+                            record_infos = 'scenario 3, offset: ' + str(a) + ' ' + str(mainfile)
+                            decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
+                            #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
+
+    #Close db file
+    file.close()
