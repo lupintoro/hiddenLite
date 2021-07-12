@@ -31,7 +31,7 @@ Examples:
 
 --> Provide every config.json file that was created at step 1)
 
---> Provide all file or directory of interest, e.g. WAL/journal/stack files, many databases with same schema, a directory with files of interest that have the same schema as in the config.json files
+--> Provide all file or directory of interest, e.g. WAL/journal/slack files, many databases with same schema, a directory with files of interest that have the same schema as in the config.json files
 
 
 Examples:
