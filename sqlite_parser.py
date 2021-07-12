@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import argparse, os, sys, struct, json, mmap, sqlite3, string
+import argparse, os, struct, json, mmap, sqlite3
 import regex as re
 
 
@@ -626,7 +626,7 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
         try:
             cursor.execute(statement)
         except:
-            #print('Exception : ', statement)
+            print('Exception : ', statement)
             pass
     else:
         print('The number of values ​​to insert is not equal to the number of columns : ', statement)
@@ -770,14 +770,18 @@ for configfile in args.config:
                         main_files_paths.append(filepath)
         elif os.path.isfile(mainfile):
             main_files.append(mainfile)
+            
         else:
             print("Nor file(s) nor directory")
 
 
 
     for mainfile in main_files:
-        index = main_files.index(mainfile)
-        open_file = main_files_paths[index]
+        if os.path.isdir(mainfile):
+            index = main_files.index(mainfile)
+            open_file = main_files_paths[index]
+        else:
+            open_file = mainfile
         #Open db file (or other file) in binary format for reading
         with open(open_file, 'r+b') as file:
             #mmap: instead of file.read() or file.readlines(), also works for big files, file content is internally loaded from disk as needed
@@ -813,7 +817,7 @@ for configfile in args.config:
                             payload = []
                             #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
                             if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
-                                record_infos = 'scenario 0, offset: ' + str(a) + ' ' + str(mainfile)
+                                record_infos = 'scenario 0, offset: ' + str(a) + ' ' + str(mainfile) 
                                 decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                                 
                                 #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
@@ -927,6 +931,9 @@ for configfile in args.config:
                                 record_infos = 'scenario 3, offset: ' + str(a) + ' ' + str(mainfile)
                                 decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
                                 #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
+
+            #Free the memory
+            mm.close()
 
         #Close db file
         file.close()

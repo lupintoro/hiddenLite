@@ -1,7 +1,5 @@
 #!/usr/bin/python3
-import argparse, os, sys, struct, sqlite3, json, mmap, itertools, copy
-from email.policy import default
-from tkinter import Y
+import argparse, os, struct, json, mmap, itertools, copy
 import regex as re
 
 
@@ -252,14 +250,16 @@ for file_name in args.filename:
                     db_files.append(fn)
                     db_paths.append(filepath)
     elif os.path.isfile(file_name):
-        db_files.append(args.filename)
+        db_files.append(file_name)
     else:
         print("Nor file nor directory")
 
-
 for db_file in db_files:
-    index = db_files.index(db_file)
-    open_file = db_paths[index]
+    if os.path.isdir(file_name):
+        index = db_files.index(db_file)
+        open_file = db_paths[index]
+    else:
+        open_file = db_file
     #Open db file to add to config.py
     with open(open_file, 'r+b') as file:
         size = os.path.getsize(open_file)
@@ -551,6 +551,11 @@ for db_file in db_files:
             with open (output_config, 'w') as config_file:
                 json.dump(config, config_file, indent=2)
             config_file.close()
+            
 
+            #Free the memory
+            mm.close()
+    
+    
     #Close the db file
     file.close()
