@@ -12,8 +12,11 @@
 
 
 Examples:
+
     config.py --filename directory
+
     config.py --filename mmssms.db
+    
     config.py --filename mmssms.db snap.db 
 
 
