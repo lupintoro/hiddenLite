@@ -237,299 +237,320 @@ def default_table(dictionary, name):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('filename')
+parser.add_argument("--filename", nargs='+')
 args = parser.parse_args()
 
-#Open db file to add to config.py
-with open(args.filename, 'r+b') as file:
-    size = os.path.getsize(args.filename)
-    file_name = (os.path.splitext(args.filename))[0]
-    
-    file.seek(0)
 
-    #Read 16 for the SQLite format 3 signature
-    signature = file.read(15)
-    
-    if signature != b'\x53\x51\x4C\x69\x74\x65\x20\x66\x6F\x72\x6D\x61\x74\x20\x33':
-        print("Not a sqlite 3 database")
-    
+db_files = []
+db_paths = []
+for file_name in args.filename:
+    if os.path.isdir(file_name):
+        for parent, dirnames, filenames in os.walk(file_name):
+            for fn in filenames:
+                filepath = os.path.join(parent, fn)
+                if fn.endswith(".sqlite") or fn.endswith(".sqlite3") or fn.endswith(".db") or fn.endswith(".db3"):
+                    db_files.append(fn)
+                    db_paths.append(filepath)
+    elif os.path.isfile(file_name):
+        db_files.append(args.filename)
     else:
-        file.read(1)
+        print("Nor file nor directory")
+
+
+for db_file in db_files:
+    index = db_files.index(db_file)
+    open_file = db_paths[index]
+    #Open db file to add to config.py
+    with open(open_file, 'r+b') as file:
+        size = os.path.getsize(open_file)
+        file_name, extension = os.path.splitext(open_file)
+        file_name = db_file.replace(extension, '')
         
-        db_infos = {}
-        db_info = []
-        db_infos["file name"] = file_name
-        #Retrieve all header information and put it into list then into dict
-        page_size = int(struct.unpack('>H', file.read(2))[0]) #here x10 x00 = 4096
-        db_infos["page size"] = page_size
+        file.seek(0)
 
-        file_format_w = int(struct.unpack('>B', file.read(1))[0]) #here x01 = RJ
-        db_infos["write version"] = file_format_w
-
-        file_format_r = int(struct.unpack('>B', file.read(1))[0]) #here x01 = RJ
-        db_infos["read version"] = file_format_r
-
-        reserved_bytes = int(struct.unpack('>B', file.read(1))[0])
-        db_infos["reserved bytes"] = reserved_bytes
-
-        file.read(3)
-
-        file_change_counter = int(struct.unpack('>i', file.read(4))[0])
-        db_infos["database updates"] = file_change_counter
-
-        number_pages = int(struct.unpack('>i', file.read(4))[0])
-        db_infos["number of pages"] = number_pages
-
-        db_size = int(page_size) * int(number_pages)
-        db_infos["database size"] = db_size
-
-        file.read(8)
-
-        schema_cookie = int(struct.unpack('>i', file.read(4))[0]) 
-        db_infos["schema changes"] = schema_cookie
-
-        file.read(12)
-
-        text_encoding = int(struct.unpack('>i', file.read(4))[0]) #here 1 = UTF-8
-        db_infos["text encoding"] = text_encoding
-
-        file.read(36)
-
-        sqlite_version = int(struct.unpack('>i', file.read(4))[0]) #here 3.31.0
-        db_infos["sqlite version"] = sqlite_version
-
-
-
-        #Config file is an array
-        config = []
-        #Append list with dict of db header information to config file
-        config.append(db_infos)
-
-
-
-
-        regex = rb'(([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))'
-        regex = re.compile(regex)
-        mm = mmap.mmap(file.fileno(), 0)
-        for match in re.finditer(regex, mm, overlapped=True):
-            unknown_header = []
-            limit = []
-            a = match.start()
-            b = match.end()
-
-            #Go to start of the match
-            file.seek(a)
-
-            decode_unknown_header(unknown_header, a, b, limit, len_start_header=3, freeblock=False)
+        #Read 16 for the SQLite format 3 signature
+        signature = file.read(15)
+        
+        if signature != b'\x53\x51\x4C\x69\x74\x65\x20\x66\x6F\x72\x6D\x61\x74\x20\x33':
+            print("Not a sqlite 3 database")
+        
+        else:
+            file.read(1)
             
+            db_infos = {}
+            db_info = []
+            db_infos["file name"] = file_name
+            #Retrieve all header information and put it into list then into dict
+            page_size = int(struct.unpack('>H', file.read(2))[0]) #here x10 x00 = 4096
+            db_infos["page size"] = page_size
 
-            payload = []
-            #Filter: if we have at least a payload length, rowid, types length and 1 type AND that payload length = sum of types and serial types array AND types not all = 0
-            if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
-                #Go to the end of the match to start reading payload content
-                file.seek(b)
-                #For each length of each type
-                for l in ((unknown_header)[3:]):
-                    #Read bytes for that length and decode it according to encoding : e.g. [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] --> read following number of bytes [0, 24, 7, 1, 0, 8, 0]
-                    payload_field = file.read(l).decode('utf-8', errors='ignore')
-                    #Decode simple 1-byte integers
-                    try:
-                        payload_field = ord(payload_field)
-                    except:
-                        payload_field = payload_field
-                    #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
-                    payload.append(payload_field)
+            file_format_w = int(struct.unpack('>B', file.read(1))[0]) #here x01 = RJ
+            db_infos["write version"] = file_format_w
+
+            file_format_r = int(struct.unpack('>B', file.read(1))[0]) #here x01 = RJ
+            db_infos["read version"] = file_format_r
+
+            reserved_bytes = int(struct.unpack('>B', file.read(1))[0])
+            db_infos["reserved bytes"] = reserved_bytes
+
+            file.read(3)
+
+            file_change_counter = int(struct.unpack('>i', file.read(4))[0])
+            db_infos["database updates"] = file_change_counter
+
+            number_pages = int(struct.unpack('>i', file.read(4))[0])
+            db_infos["number of pages"] = number_pages
+
+            db_size = int(page_size) * int(number_pages)
+            db_infos["database size"] = db_size
+
+            file.read(8)
+
+            schema_cookie = int(struct.unpack('>i', file.read(4))[0]) 
+            db_infos["schema changes"] = schema_cookie
+
+            file.read(12)
+
+            text_encoding = int(struct.unpack('>i', file.read(4))[0]) #here 1 = UTF-8
+            db_infos["text encoding"] = text_encoding
+
+            file.read(36)
+
+            sqlite_version = int(struct.unpack('>i', file.read(4))[0]) #here 3.31.0
+            db_infos["sqlite version"] = sqlite_version
 
 
 
-                if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]) and ('sqlite_' not in payload[4]):
-                    #Continue completing config.json with table/fields information
-                    table_name = payload[1]
-                    #Corpus 01-18.db
-                    for i in table_name:
-                        if ord(i) <= 20:
-                            table_name = table_name.replace(i, 'character_before_20')
-                    #Corpus 01-13.db
-                    if payload[1] == 40:
-                        fields = payload[4].split('(',2)[2]
-                    else:
-                        fields = payload[4].split('(',1)[1]
+            #Config file is an array
+            config = []
+            #Append list with dict of db header information to config file
+            config.append(db_infos)
 
-                    #Corpus 01-all special characters cases
-                    if type(table_name) == int:
-                        table_name = 'special_character_' + str(table_name)
 
-                    #Clean table name
-                    if table_name.startswith("'") and table_name.endswith("'"):
-                        table_name = table_name[1:-1]
-                        #Corpus 01-01.db
-                        if table_name == '':
-                            table_name = '\'\''
-                    if table_name.startswith('"') and table_name.endswith('"'):
-                        table_name = table_name[1:-1]
-                        #Corpus 01-01.db
+
+
+            regex = rb'(([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))'
+            regex = re.compile(regex)
+            mm = mmap.mmap(file.fileno(), 0)
+            for match in re.finditer(regex, mm, overlapped=True):
+                unknown_header = []
+                limit = []
+                a = match.start()
+                b = match.end()
+
+                #Go to start of the match
+                file.seek(a)
+
+                decode_unknown_header(unknown_header, a, b, limit, len_start_header=3, freeblock=False)
+                
+
+                payload = []
+                #Filter: if we have at least a payload length, rowid, types length and 1 type AND that payload length = sum of types and serial types array AND types not all = 0
+                if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
+                    #Go to the end of the match to start reading payload content
+                    file.seek(b)
+                    #For each length of each type
+                    for l in ((unknown_header)[3:]):
+                        #Read bytes for that length and decode it according to encoding : e.g. [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] --> read following number of bytes [0, 24, 7, 1, 0, 8, 0]
+                        payload_field = file.read(l).decode('utf-8', errors='ignore')
+                        #Decode simple 1-byte integers
+                        try:
+                            payload_field = ord(payload_field)
+                        except:
+                            payload_field = payload_field
+                        #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
+                        payload.append(payload_field)
+
+
+
+                    if payload[0] == 'table' and ('CREATE TABLE' or 'create table' in payload[4]) and ('sqlite_' not in payload[4]):
+                        #Continue completing config.json with table/fields information
+                        table_name = payload[1]
+                        #Corpus 01-18.db
+                        for i in table_name:
+                            if ord(i) <= 20:
+                                table_name = table_name.replace(i, 'character_before_20')
+                        #Corpus 01-13.db
+                        if payload[1] == 40:
+                            fields = payload[4].split('(',2)[2]
+                        else:
+                            fields = payload[4].split('(',1)[1]
+
+                        #Corpus 01-all special characters cases
+                        if type(table_name) == int:
+                            table_name = 'special_character_' + str(table_name)
+
+                        #Clean table name
+                        if table_name.startswith("'") and table_name.endswith("'"):
+                            table_name = table_name[1:-1]
+                            #Corpus 01-01.db
+                            if table_name == '':
+                                table_name = '\'\''
+                        if table_name.startswith('"') and table_name.endswith('"'):
+                            table_name = table_name[1:-1]
+                            #Corpus 01-01.db
+                            if table_name == '':
+                                table_name = '\"\"'
+                        # if table_name.startswith('[') and table_name.endswith(']'):
+                        #     table_name = table_name[1:-1]
+                            #Corpus 01-01.db
+                            if table_name == '':
+                                table_name = '[]'
+                        
+                        #Corpus 01-02.db
+                        table_name = table_name.replace("'", "apostrophe_exception_name")
+                        table_name = table_name.replace('"', "quotation_exception_name")
+                        table_name = table_name.replace('--', "double_dash_exception_name")
+                        table_name = table_name.replace('%s', "parameterized_string_exception_name")
                         if table_name == '':
                             table_name = '\"\"'
-                    # if table_name.startswith('[') and table_name.endswith(']'):
-                    #     table_name = table_name[1:-1]
-                        #Corpus 01-01.db
-                        if table_name == '':
-                            table_name = '[]'
-                    
-                    #Corpus 01-02.db
-                    table_name = table_name.replace("'", "apostrophe_exception_name")
-                    table_name = table_name.replace('"', "quotation_exception_name")
-                    table_name = table_name.replace('--', "double_dash_exception_name")
-                    table_name = table_name.replace('%s', "parameterized_string_exception_name")
-                    if table_name == '':
-                        table_name = '\"\"'
-
-                    
-                    #Clean fields
-                    if fields.endswith(' )'):
-                        fields = fields[:-2]
-                    if fields.endswith(')'):
-                        fields = fields[:-1]    
-
-                    fields = re.sub(r'(PRIMARY KEY){1}( )*\({1}.+', '', fields)
-                    fields = re.sub(r'(UNIQUE){1}( )*\({1}.+', '', fields)
-                    fields = re.sub(r'(FOREIGN KEY){1}( )*\({1}.+', '', fields)
-                    fields = re.sub(r'(CHECK){1}( )*\({1}.+', '', fields)
-                    fields = re.sub(r'(REFERENCES ){1}.*', '', fields)
-                    fields = re.sub(r'(CONSTRAINT ){1}.*', '', fields)
-
-
-                    if fields.endswith(','):
-                        fields = fields[:-1]
-
-                    #Fields are separated by commas
-                    fields = fields.split(',')
-
-                    #Put table name and each associated field in same list
-                    field_list_config = []
-
-
-                    #Make a dictionary for each field, name:type
-                    #The type is one of the types in serial_types_list
-                    for i in fields:
-                        #Cleaning again
-                        if i.startswith('\n\t'):
-                            i = i[1:]
-                        if i.startswith('\n\\'):
-                            i = i[2:]
-                        if i.startswith(' '):
-                            i = i[1:]
-                        i = i.replace('\t', ' ')
-                        i = i.replace('\n', '')
-                        i = i.replace('\\', '')
-                        if i.startswith(' "'):
-                            i = i[2:]
-                        
-                        if i.startswith('   '):
-                            i = i[3:]
-
-                        if i.startswith('  '):
-                            i = i[2:]
-
-                        if i.startswith(' '):
-                            i = i[1:]
-                        
-                        #Separate name and type by first space...
-                        _name_ = i.partition(' ')
-                        if _name_[0] == '':
-                            _name_ = i.partition(' ')
-
-                        name_ = _name_[0]
-                        type_ = _name_[2]
 
                         
-                        if name_.startswith("'") and name_.endswith("'"):
-                            name_ = name_[1:-1]
-                        if name_.startswith('"') and name_.endswith('"'):
-                            name_ = name_[1:-1]
-                        # if name_.startswith('[') and name_.endswith(']'):
-                        #     name_ = name_[1:-1]
-                        if name_.endswith(' "'):
-                            name_ = name_[:-2]
-                        # if name_.endswith('"') or name_.endswith(']'):
-                        #     name_ = name_[:-1]
+                        #Clean fields
+                        if fields.endswith(' )'):
+                            fields = fields[:-2]
+                        if fields.endswith(')'):
+                            fields = fields[:-1]    
 
-                                            
-                        if (name_ == '' and type_ == '') or (name_ == "\n" and type_ == "") or (name_ == "" and type_ == " ") or (name_ == "" and type_ == "  "):
-                            pass
-                        else:
-                            if type_ == '':
-                                type_ = 'NUMERIC'
-                            for key,value in types_affinities.items():
-                                if 'DEFAULT' not in type_:
-                                    type_ = re.sub(rf'.*{key}.*', value, type_, flags=re.IGNORECASE)
-                                else:
-                                    type_ = re.sub(rf'.*{key}.*', value + ' DEFAULT 0', type_, flags=re.IGNORECASE)
+                        fields = re.sub(r'(PRIMARY KEY){1}( )*\({1}.+', '', fields)
+                        fields = re.sub(r'(UNIQUE){1}( )*\({1}.+', '', fields)
+                        fields = re.sub(r'(FOREIGN KEY){1}( )*\({1}.+', '', fields)
+                        fields = re.sub(r'(CHECK){1}( )*\({1}.+', '', fields)
+                        fields = re.sub(r'(REFERENCES ){1}.*', '', fields)
+                        fields = re.sub(r'(CONSTRAINT ){1}.*', '', fields)
 
-                            if type_ not in types_list_2 and 'DEFAULT' not in type_:
-                                if 'NOT NULL' in type_:
-                                    type_ = 'NUMERIC NOT NULL'
-                                else:
-                                    type_ = 'NUMERIC'
+
+                        if fields.endswith(','):
+                            fields = fields[:-1]
+
+                        #Fields are separated by commas
+                        fields = fields.split(',')
+
+                        #Put table name and each associated field in same list
+                        field_list_config = []
+
+
+                        #Make a dictionary for each field, name:type
+                        #The type is one of the types in serial_types_list
+                        for i in fields:
+                            #Cleaning again
+                            if i.startswith('\n\t'):
+                                i = i[1:]
+                            if i.startswith('\n\\'):
+                                i = i[2:]
+                            if i.startswith(' '):
+                                i = i[1:]
+                            i = i.replace('\t', ' ')
+                            i = i.replace('\n', '')
+                            i = i.replace('\\', '')
+                            if i.startswith(' "'):
+                                i = i[2:]
                             
-                            field_list_config.append(name_)
-                            field_list_config.append(type_)
+                            if i.startswith('   '):
+                                i = i[3:]
+
+                            if i.startswith('  '):
+                                i = i[2:]
+
+                            if i.startswith(' '):
+                                i = i[1:]
+                            
+                            #Separate name and type by first space...
+                            _name_ = i.partition(' ')
+                            if _name_[0] == '':
+                                _name_ = i.partition(' ')
+
+                            name_ = _name_[0]
+                            type_ = _name_[2]
+
+                            
+                            if name_.startswith("'") and name_.endswith("'"):
+                                name_ = name_[1:-1]
+                            if name_.startswith('"') and name_.endswith('"'):
+                                name_ = name_[1:-1]
+                            # if name_.startswith('[') and name_.endswith(']'):
+                            #     name_ = name_[1:-1]
+                            if name_.endswith(' "'):
+                                name_ = name_[:-2]
+                            # if name_.endswith('"') or name_.endswith(']'):
+                            #     name_ = name_[:-1]
+
+                                                
+                            if (name_ == '' and type_ == '') or (name_ == "\n" and type_ == "") or (name_ == "" and type_ == " ") or (name_ == "" and type_ == "  "):
+                                pass
+                            else:
+                                if type_ == '':
+                                    type_ = 'NUMERIC'
+                                for key,value in types_affinities.items():
+                                    if 'DEFAULT' not in type_:
+                                        type_ = re.sub(rf'.*{key}.*', value, type_, flags=re.IGNORECASE)
+                                    else:
+                                        type_ = re.sub(rf'.*{key}.*', value + ' DEFAULT 0', type_, flags=re.IGNORECASE)
+
+                                if type_ not in types_list_2 and 'DEFAULT' not in type_:
+                                    if 'NOT NULL' in type_:
+                                        type_ = 'NUMERIC NOT NULL'
+                                    else:
+                                        type_ = 'NUMERIC'
+                                
+                                field_list_config.append(name_)
+                                field_list_config.append(type_)
+                        
+                        
+                        dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
                     
-                    
-                    dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
-                   
-                    fields_lists_config = {table_name:dict_transf_config}
+                        fields_lists_config = {table_name:dict_transf_config}
 
-                    #Append list with table_name, fields to config file
-                    if fields_lists_config not in config:
-                        config.append(fields_lists_config)
+                        #Append list with table_name, fields to config file
+                        if fields_lists_config not in config:
+                            config.append(fields_lists_config)
 
 
-        keys_copies = {}
-        for a,b in itertools.combinations(config[1:],2):
-            if a.keys() == b.keys():
-                for key,value in b.items():
-                    element = str(key) + '_copy'
-                    keys_copies[key] = element
-        
-        for a,b in itertools.combinations(config[1:],2):
-            if a.keys() == b.keys():
-                for key,value in keys_copies.items():
-                    for key1,value1 in b.copy().items():
-                        if key == key1:
-                            b[value] = b[key1]
-                            del b[key]
-        
-        keys_default = {}
+            keys_copies = {}
+            for a,b in itertools.combinations(config[1:],2):
+                if a.keys() == b.keys():
+                    for key,value in b.items():
+                        element = str(key) + '_copy'
+                        keys_copies[key] = element
+            
+            for a,b in itertools.combinations(config[1:],2):
+                if a.keys() == b.keys():
+                    for key,value in keys_copies.items():
+                        for key1,value1 in b.copy().items():
+                            if key == key1:
+                                b[value] = b[key1]
+                                del b[key]
+            
+            keys_default = {}
 
 
-        #Default case
-        name = 0
-        z = 1
-        x = len(config)
-        default_table(config[z:], name)
-        name+=1
-        default_table(config[x-z:], name)
-        
-        
-        while True:
+            #Default case
+            name = 0
+            z = 1
+            x = len(config)
+            default_table(config[z:], name)
             name+=1
-            y = len(config)
-            default_table(config[y-z:], name)
-            w = len(config)
-            if w==y:
-                break
-            else:
-                continue
+            default_table(config[x-z:], name)
+            
+            
+            while True:
+                name+=1
+                y = len(config)
+                default_table(config[y-z:], name)
+                w = len(config)
+                if w==y:
+                    break
+                else:
+                    continue
 
-        
-        #Create new db if already exists
-        output_config = "config_%s.json" % file_name
-        
-        #Write config array in a json file
-        with open (output_config, 'w') as config_file:
-            json.dump(config, config_file, indent=2)
-        config_file.close()
+            
+            #Create new db if already exists
+            output_config = "config_%s.json" % file_name
+            
+            #Write config array in a json file
+            with open (output_config, 'w') as config_file:
+                json.dump(config, config_file, indent=2)
+            config_file.close()
 
-#Close the db file
-file.close()
+    #Close the db file
+    file.close()
