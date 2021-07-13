@@ -263,7 +263,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
         
 
         #Regex for serial types array length, min and max size
-        if not freeblock or scenario == 3:
+        if (not freeblock) or (scenario == 3 or 4):
             for element in header_pattern:
                 counter_min += 1
                 if element in multiple_bytes:
@@ -283,11 +283,14 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             else:
                 counter_min = format(counter_min,'x').zfill(2)
                 counter_max = format(counter_max,'x').zfill(2)
+                if scenario == 4:
+                    counter_max = 80
                 serial_types_array_length = rf'([\x{counter_min}-\x{counter_max}]{{1}})'
                 array_min_max.append(serial_types_array_length)
 
             counter_min = 1
             counter_max = 1
+
 
         #If type1 overwritten, remove first type from types and surround header group by ()
         if type1:
@@ -308,6 +311,14 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
         if scenario == 3:
             for index in range(len(freeblock_min_max)):
                 start_header = '(' + next_freeblock + freeblock_min_max[index] + array_min_max[index] + ')'
+                starts_headers.append(start_header)
+        elif scenario == 4:
+            for index in range(len(freeblock_min_max)):
+                start_header = '(' + next_freeblock + freeblock_min_max[index] + array_min_max[index] + ')'
+                starts_headers.append(start_header)
+        elif scenario == 5 or 6:
+            for index in range(len(freeblock_min_max)):
+                start_header = '(' + next_freeblock + freeblock_min_max[index] + row_id + array_min_max[index] + ')'
                 starts_headers.append(start_header)
         else:
             for index in range(len(freeblock_min_max)):
@@ -755,6 +766,29 @@ for configfile in args.config:
     build_regex(header_pattern_s3, headers_patterns_s3, list_fields_s3, lists_fields_s3, regex_constructs_s3, tables_regexes_s3, starts_headers_s3, scenario=3, freeblock=True, type1=False)
 
 
+    header_pattern_s4 = []
+    headers_patterns_s4 = []
+    regex_constructs_s4 = []
+    tables_regexes_s4 = []
+    list_fields_s4 = []
+    lists_fields_s4 = []
+    starts_headers_s4 = []
+
+    build_regex(header_pattern_s4, headers_patterns_s4, list_fields_s4, lists_fields_s4, regex_constructs_s4, tables_regexes_s4, starts_headers_s4, scenario=4, freeblock=True, type1=False)
+
+
+    header_pattern_s5 = []
+    headers_patterns_s5 = []
+    regex_constructs_s5 = []
+    tables_regexes_s5 = []
+    list_fields_s5 = []
+    lists_fields_s5 = []
+    starts_headers_s5 = []
+
+    build_regex(header_pattern_s5, headers_patterns_s5, list_fields_s5, lists_fields_s5, regex_constructs_s5, tables_regexes_s5, starts_headers_s5, scenario=5, freeblock=True, type1=False)
+
+
+
 
     main_files = []
     main_files_paths = []
@@ -790,7 +824,7 @@ for configfile in args.config:
 
 
 
-            """SCENARIO 0 : non-deleted records in db file (or records in journal/WAL files that keep same structure)"""
+            """SCENARIO 0 : non-deleted records in db file (or records in journal/WAL/slack files that keep same structure)"""
             # For each regex of types per table : e.g. table urls regex.Regex(b'(([\x01-\x80]{1})|([\x81-\xff]{1}[\x00-\x80]{1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{0,1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x00-\x80]{1}))[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}[\x00-\x09]{1}(([\x08]|[\x09]){1})(([\x08]|[\x09]){1})', flags=regex.A | regex.V0)
             for table_regex in tables_regexes:
                 for table, fields_regex in table_regex.items():
@@ -816,7 +850,7 @@ for configfile in args.config:
                         else:
                             payload = []
                             #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
-                            if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
+                            if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]) and (len(unknown_header) > 3):
                                 record_infos = 'scenario 0, offset: ' + str(a) + ' ' + str(mainfile) 
                                 decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
                                 
@@ -927,10 +961,72 @@ for configfile in args.config:
                             payload_s3 = []
                             #WARNING: false positives with 1 and 2-columns headers that can easily match
                             #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
-                            if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2])):
+                            if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2]) and (len(unknown_header_s3) > 3)):
                                 record_infos = 'scenario 3, offset: ' + str(a) + ' ' + str(mainfile)
                                 decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
                                 #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
+            
+
+
+
+            """SCENARIO 4 : overwritten : payload length, rowid, part of serial types array length --> start at part of serial types array length"""
+            #As for scenario 0
+            for table_regex_s4 in tables_regexes_s4:
+                for table_s4, fields_regex_s4 in table_regex_s4.items():
+                    for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True):
+                        
+                        unknown_header_s4 = []
+                        unknown_header_2_s4 = []
+                        limit_s4 = []
+                        a = match_s4.start()
+                        b = match_s4.end()
+                        file.seek(a)
+                        decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, scenario=4, freeblock=True)
+
+                        if not limit_s4:
+                            pass
+                        else:
+                            payload_s4 = []
+                            #We assume serial types array length cannot be > 2 bytes, otherwise too much columns, so here 1 byte is overwritten, 1 not
+                            #If second part of serial types array length is less than 128 and if sum of bytes of header and sum of types equal to freeblock length and if sum of types not equal to 0
+                            if ((unknown_header_s4[2] < 128) and ((somme(unknown_header_s4[3:]) + (b-a+1)) == (unknown_header_s4[1])) and ((somme(unknown_header_s4[3:]) != 0)) and (len(unknown_header_s4) > 3)):
+                                record_infos = 'scenario 4, offset: ' + str(a) + ' ' + str(mainfile)
+                                decode_record(output_db, table_s4, b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos, z=3)
+                                #print('SCENARIO 4: ', table_s4, unknown_header_s4, payload_s4, '\n\n')
+            
+
+
+
+
+            """SCENARIO 5 : overwritten : payload length, part of rowid --> start at part of rowid"""
+            #This scenario also covers SCENARIO 6 if payload length is 4 bytes --> start at rowid
+            #As rowid can be anything, starting at part of it or starting at the entire rowid does not change anything
+            #If payload length is exactly 4 bytes or more in length, it is greater than 512MB, which is unlikely to happen
+
+            #As for scenario 0
+            for table_regex_s5 in tables_regexes_s5:
+                for table_s5, fields_regex_s5 in table_regex_s5.items():
+                    for match_s5 in re.finditer(fields_regex_s5[2], mm, overlapped=True):
+                        
+                        unknown_header_s5 = []
+                        unknown_header_2_s5 = []
+                        limit_s5 = []
+                        a = match_s5.start()
+                        b = match_s5.end()
+                        file.seek(a)
+                        
+                        decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=3, scenario=5, freeblock=True)
+
+                        if not limit_s5:
+                            pass
+                        else:
+                            payload_s5 = []
+                            #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
+                            if (((somme(unknown_header_s5[4:]) + unknown_header_s5[3] + 4 + (b-a+1-4-unknown_header_s5[3])) == (unknown_header_s5[1])) and ((somme(unknown_header_s5[2:]) != 0)) and (len(unknown_header_s5) > 4)):
+                                record_infos = 'scenario 5, offset: ' + str(a) + ' ' + str(mainfile)
+                                decode_record(output_db, table_s5, b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos, z=3)
+                                #print('SCENARIO 5: ', table_s5, unknown_header_s5, payload_s5, '\n\n')
+
 
             #Free the memory
             mm.close()
