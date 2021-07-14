@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import argparse, os, struct, json, mmap, itertools, copy
+from multiprocessing.connection import wait
 import regex as re
 
 
@@ -218,7 +219,7 @@ def default_table(dictionary, name):
             list_values = list(value2.values())
             list_keys = list(value2.keys())
 
-            if 'DEFAULT' in list_values[-1] and len(list_values) > 5:
+            if 'DEFAULT' in list_values[-1] and len(list_values) > 6:
                 default_dict = copy.deepcopy(dictionaries)
                 for key,value in default_dict.items():
                     value.pop(list_keys[-1])
@@ -230,8 +231,9 @@ def default_table(dictionary, name):
                         if key == key1:
                             default_dict[value1] = default_dict[key]
                             del default_dict[key]
-                
                 config.append(default_dict)
+            else:
+                break
          
 
 
@@ -505,19 +507,18 @@ for db_file in db_files:
                                 field_list_config.append(type_)
                         
 
-                        if 'DEfAULT' not in field_list_config[-1]:
-                            try:
-                                if 'DEFAULT' in field_list_config[-5]:
-                                    try:
-                                        if 'DEFAULT' in field_list_config[-3]:
-                                            field_list_config[-1] += ' DEFAULT NULL'
-                                        else:
-                                            field_list_config[-3] += ' DEFAULT NULL'
-                                            field_list_config[-1] += ' DEFAULT NULL'
-                                    except IndexError:
-                                        pass
-                            except IndexError:
-                                pass
+                        #For tables with > 6 columns, add DEFAULT NULL at the 3 last columns if they don't already contain a DEFAULT or a NOT NULL condition
+                        #This is to handle versions of the tables that just add columns afterwards and old records that have less columns take their default value...
+                        if len(field_list_config) >= 12 :
+                            if 'DEFAULT' not in field_list_config[-1]:
+                                if 'NOT NULL' not in field_list_config[-1]:
+                                    field_list_config[-1] += ' DEFAULT NULL'
+                            if 'DEFAULT' not in field_list_config[-3]:
+                                if 'NOT NULL' not in field_list_config[-3]:
+                                    field_list_config[-3] += ' DEFAULT NULL'
+                            if 'DEFAULT' not in field_list_config[-5]:
+                                if 'NOT NULL' not in field_list_config[-5]:
+                                    field_list_config[-5] += ' DEFAULT NULL'
 
                         
                         dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
@@ -528,7 +529,7 @@ for db_file in db_files:
                         if fields_lists_config not in config:
                             config.append(fields_lists_config)
 
-
+            #Table_name + '_copy' if two tables share the same name in schema
             keys_copies = {}
             for a,b in itertools.combinations(config[1:],2):
                 if a.keys() == b.keys():
@@ -547,24 +548,25 @@ for db_file in db_files:
             keys_default = {}
 
 
-            #Default case
-            name = 0
+            #Default case : take out 3 last default for tables > 6 columns and create new tables, potential old versions
+            name = '_default_0'
             z = 1
             x = len(config)
             default_table(config[z:], name)
-            name+=1
-            default_table(config[x-z:], name)
-            
-            
-            while True:
-                name+=1
-                y = len(config)
-                default_table(config[y-z:], name)
-                w = len(config)
-                if w==y:
-                    break
-                else:
-                    continue
+            name = '_1'
+            y = len(config)
+            if y == x:
+                break
+            default_table(config[x:], name)
+            name = '_2'
+            w = len(config)
+            if w == y:
+                break
+            default_table(config[y:], name)
+            name = '_3'
+            v = len(config)
+            if v == w:
+                break
 
             
             #Create new db if already exists
