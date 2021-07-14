@@ -239,6 +239,7 @@ def default_table(dictionary, name):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--filename", nargs='+')
+parser.add_argument("--output")
 args = parser.parse_args()
 
 
@@ -571,9 +572,9 @@ for db_file in db_files:
             
             #Create new db if already exists
             output_config = "config_%s.json" % file_name
-            
+       
             #Write config array in a json file
-            with open (output_config, 'w') as config_file:
+            with open (args.output + output_config, 'w') as config_file:
                 json.dump(config, config_file, indent=2)
             config_file.close()
             

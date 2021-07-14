@@ -670,6 +670,7 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", nargs='+')
 parser.add_argument("--main_file", nargs='+')
+parser.add_argument("--output")
 args = parser.parse_args()
 
 
@@ -700,7 +701,7 @@ for configfile in args.config:
             final_statement = 'CREATE TABLE ' + key + ' ' + statement
         
         #Create same DB but empty to write output in
-        conn = sqlite3.connect(output_db)
+        conn = sqlite3.connect(args.output + output_db)
 
         try:
             conn.execute(final_statement)
