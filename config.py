@@ -4,13 +4,14 @@ import regex as re
 
 
 types_list_2 = ['INTEGER PRIMARY KEY', 'INTEGER', 'INTEGER NOT NULL', 'BOOLEAN', 'BOOLEAN NOT NULL', 'REAL', 'REAL NOT NULL', 
-'TEXT', 'TEXT NOT NULL', 'NUMERIC', 'NUMERIC NOT NULL', 'BLOB', 'BLOB NOT NULL']
+'TEXT', 'TEXT NOT NULL', 'NUMERIC', 'NUMERIC NOT NULL', 'DATETIME', 'DATETIME NOT NULL', 'BLOB', 'BLOB NOT NULL']
 
-types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT|DATE)(?!.*NO.*NULL)(?!.*PRIMARY.*KEY))':'INTEGER', 
-'((INT|DATE)(.*NO.*NULL))':'INTEGER NOT NULL', '(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', 
+types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT)(?!.*NO.*NULL)(?!.*PRIMARY.*KEY))':'INTEGER', 
+'((INT)(.*NO.*NULL))':'INTEGER NOT NULL', '(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', 
 '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'TEXT', '((CHAR|TEXT|CLOB)(.*NO.*NULL))':'TEXT NOT NULL', '(BLOB(?!.*NO.*NULL))':'BLOB', 
 '(BLOB.*NO.*NULL)':'BLOB NOT NULL', '((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'REAL', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'REAL NOT NULL', 
-'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL))':'NUMERIC', '((NUMERIC|JSON)(.*NO.*NULL))':'NUMERIC NOT NULL'}
+'((NUMERIC|JSON)(?!.*NO.*NULL))':'NUMERIC', '((NUMERIC|JSON)(.*NO.*NULL))':'NUMERIC NOT NULL',
+'((DATE)(?!.*NO.*NULL))':'DATETIME', '((DATE)(.*NO.*NULL))':'DATETIME NOT NULL'}
 
 
 #To sum elements in list
@@ -472,8 +473,15 @@ for db_file in db_files:
                             #     name_ = name_[1:-1]
                             if name_.endswith(' "'):
                                 name_ = name_[:-2]
-                            # if name_.endswith('"') or name_.endswith(']'):
-                            #     name_ = name_[:-1]
+                            if (name_.endswith('"') and (not name_.startswith('"'))):
+                                name_ = name_[:-1]
+                            if (name_.startswith('"') and (not name_.endswith('"'))):
+                                name_ = name_[1:]
+
+                            if (name_.endswith(']') and (not name_.startswith('['))):
+                                name_ = name_[:-1]
+                            if (name_.startswith('[') and (not name_.endswith(']'))):
+                                name_ = name_[1:]
 
                                                 
                             if (name_ == '' and type_ == '') or (name_ == "\n" and type_ == "") or (name_ == "" and type_ == " ") or (name_ == "" and type_ == "  "):
@@ -496,11 +504,26 @@ for db_file in db_files:
                                 field_list_config.append(name_)
                                 field_list_config.append(type_)
                         
+
+                        if 'DEfAULT' not in field_list_config[-1]:
+                            try:
+                                if 'DEFAULT' in field_list_config[-5]:
+                                    try:
+                                        if 'DEFAULT' in field_list_config[-3]:
+                                            field_list_config[-1] += ' DEFAULT NULL'
+                                        else:
+                                            field_list_config[-3] += ' DEFAULT NULL'
+                                            field_list_config[-1] += ' DEFAULT NULL'
+                                    except IndexError:
+                                        pass
+                            except IndexError:
+                                pass
+
                         
                         dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
                     
                         fields_lists_config = {table_name:dict_transf_config}
-
+                        
                         #Append list with table_name, fields to config file
                         if fields_lists_config not in config:
                             config.append(fields_lists_config)

@@ -16,43 +16,49 @@ boolean_not_null = r'(([\x08]|[\x09]){1})'
 real = r'(([\x00]|[\x07]){1})'
 real_not_null = r'([\x07]{1})'
 
-text = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00]{1})|([\x0d-\x80]{1}))'
-text_not_null = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x0d-\x80]{1}))'
+text = r'((([\x81-\xff]{1,3})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x00|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
+text_not_null = r'((([\x81-\xff]{1,3})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
 
-numeric = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00]{1})|([\x00-\x80]{1}))'
-numeric_not_null = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))'
+numeric_date = r'(([\x81-\xff]{1,3}[\x00-\x80]{1})|([\x00]{1})|([\x00-\x80]{1}))'
+numeric_date_not_null = r'(([\x81-\xff]{1,3}[\x00-\x80]{1})|([\x00-\x80]{1}))'
 
-blob = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00]{1})|([\x0c-\x80]{1}))'
-blob_not_null = r'(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x0c-\x80]{1}))'
+numeric = r'(([\x81-\xff]{1,3}[\x00-\x80]{1})|([\x00]{1})|([\x00-\x80]{1}))'
+numeric_not_null = r'(([\x81-\xff]{1,3}[\x00-\x80]{1})|([\x00-\x80]{1}))'
 
-
-#Regexes payload content
-nothing = r''
-strings = r'((?<=[\x20-\xff])*)'
-strings_not_null = r'((?<=[\x20-\xff])+)'
-numbers = r'((?<=[\x00-\xff]){0,9})'
-numbers_not_null = r'((?<=[\x00-\xff]){1,9})'
-floating = r'((?<=\'\')|(?<=[\x00-\xff]){8})'
-floating_not_null = r'((?<=[\x00-\xff]){8})'
-everything = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])*)'
-everything_not_null = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])+)'
+blob = r'((([\x81-\xff]{1,3})([\x00|\x02|\x04|\x06|\x08|\x0a|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}){1})|([\x00|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}))'
+blob_not_null = r'((([\x81-\xff]{1,3})([\x00|\x02|\x04|\x06|\x08|\x0a|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}){1})|([\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}))'
 
 
-types_list = ['zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null', 'numeric', 'numeric_not_null', 'blob', 'blob_not_null']
 
-types_sub = {'(INTEGER PRIMARY KEY)':'zero', '((INT|DATE)(?!.*NO.*NULL))':'integer', '((INT|DATE)(.*NO.*NULL))':'integer_not_null', 
+# #Regexes payload content
+# nothing = r''
+# strings = r'((?<=[\x20-\xff])*)'
+# strings_not_null = r'((?<=[\x20-\xff])+)'
+# numbers = r'((?<=[\x00-\xff]){0,9})'
+# numbers_not_null = r'((?<=[\x00-\xff]){1,9})'
+# floating = r'((?<=\'\')|(?<=[\x00-\xff]){8})'
+# floating_not_null = r'((?<=[\x00-\xff]){8})'
+# everything = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])*)'
+# everything_not_null = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])+)'
+
+
+types_list = ['zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null', 
+'numeric', 'numeric_not_null', 'numeric_date', 'numeric_date_not_null' 'blob', 'blob_not_null']
+
+types_sub = {'(INTEGER PRIMARY KEY)':'zero', '((INT)(?!.*NO.*NULL))':'integer', '((INT)(.*NO.*NULL))':'integer_not_null', 
 '(BOOL(?!.*NO.*NULL))':'boolean', '(BOOL.*NO.*NULL)':'boolean_not_null', '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'text', 
 '((CHAR|TEXT|CLOB)(.*NO.*NULL))':'text_not_null', '(BLOB(?!.*NO.*NULL))':'blob', '(BLOB.*NO.*NULL)':'blob_not_null',
-'((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'real', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'real_not_null', 
-'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL))':'numeric', '((NUMERIC|JSON|GUID|UUID)(.*NO.*NULL))':'numeric_not_null'}
+'((REAL|DOUB|FLOA)(?!.*NO.*NULL))':'real', '((REAL|DOUB|FLOA)(.*NO.*NULL))':'real_not_null',
+'((NUMERIC|JSON|GUID|UUID)(?!.*NO.*NULL)(?!.*DATE))':'numeric', '((NUMERIC|JSON|GUID|UUID)(?!.*DATE)(.*NO.*NULL))':'numeric_not_null',
+'((DATE)(?!.*NO.*NULL))':'numeric_date', '((DATE)(.*NO.*NULL))':'numeric_date_not_null'}
 
 dict_types = {'zero':zero, 'integer':integer, 'integer_not_null':integer_not_null, 'boolean':boolean, 'boolean_not_null':boolean_not_null, 
 'real':real, 'real_not_null':real_not_null, 'blob':blob, 'blob_not_null':blob_not_null, 'text':text, 'text_not_null':text_not_null,
-'numeric':numeric, 'numeric_not_null':numeric_not_null}
+'numeric_date':numeric_date, 'numeric_date_not_null':numeric_date_not_null, 'numeric':numeric, 'numeric_not_null':numeric_not_null}
 
-dict_payload = {'zero':nothing, 'integer':numbers, 'integer_not_null':numbers_not_null, 'boolean':nothing, 'boolean_not_null':nothing,
-'real':floating, 'real_not_null':floating_not_null, 'blob':everything, 'blob_not_null':everything_not_null, 'text':strings, 
-'text_not_null':strings_not_null, 'numeric':everything, 'numeric_not_null':everything_not_null}
+# dict_payload = {'zero':nothing, 'integer':numbers, 'integer_not_null':numbers_not_null, 'boolean':nothing, 'boolean_not_null':nothing,
+# 'real':floating, 'real_not_null':floating_not_null, 'blob':everything, 'blob_not_null':everything_not_null, 'text':strings, 
+# 'text_not_null':strings_not_null, 'numeric':everything, 'numeric_not_null':everything_not_null}
 
 
 
@@ -168,7 +174,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
     counter_max = 1
 
     #Types that have a fixed min/max size in bytes VS that size can vary
-    multiple_bytes = ['text', 'text_not_null', 'numeric' 'numeric_not_null' 'blob' 'blob_not_null']
+    multiple_bytes = ['text', 'text_not_null', 'numeric_date', 'numeric_date_not_null' 'numeric' 'numeric_not_null' 'blob' 'blob_not_null']
     fixed_bytes = ['zero', 'boolean', 'boolean_not_null', 'integer', 'integer_not_null', 'real', 'real_not_null']
 
 
@@ -232,9 +238,10 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             j = header_pattern.count('text_not_null')
             k = header_pattern.count('numeric_not_null')
             l = header_pattern.count('blob_not_null')
+            m = header_pattern.count('numeric_date_not_null')
             
             #We can still compute a min size, based on number of columns and types
-            minimum = (len(header_pattern) + h + i + j + k + l)
+            minimum = (len(header_pattern) + h + i + j + k + l + m)
 
 
             if freeblock:
@@ -255,7 +262,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
                 count_min += minimum
                 count_min = format(count_min,'x').zfill(2)
 
-                payload_length = rf'((([\x81-\xff]{{1,8}}[\x00-\x80]{{1}})|([\x{count_min}-\x80]{{1}})){{1}})'
+                payload_length = rf'((([\x81-\xff]{{1,3}}[\x00-\x80]{{1}})|([\x{count_min}-\x80]{{1}})){{1}})'
                 
                 payload_min_max.append(payload_length)
 
@@ -316,17 +323,17 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             for index in range(len(freeblock_min_max)):
                 start_header = '(' + next_freeblock + freeblock_min_max[index] + array_min_max[index] + ')'
                 starts_headers.append(start_header)
-        elif scenario == 5 or 6:
+        elif scenario == 5 or scenario == 6:
             for index in range(len(freeblock_min_max)):
                 start_header = '(' + next_freeblock + freeblock_min_max[index] + row_id + array_min_max[index] + ')'
                 starts_headers.append(start_header)
-        else:
+        elif scenario == 1 or scenario == 2:
             for index in range(len(freeblock_min_max)):
                 start_header = '(' + next_freeblock + freeblock_min_max[index] + ')'
                 starts_headers.append(start_header)
     
     #Start of header if no freeblock (payload length, row_id, serial types array length)
-    else:
+    elif not freeblock:
         for index in range(len(payload_min_max)):
             start_header = '(' + payload_min_max[index] + row_id + array_min_max[index] + ')'
             starts_headers.append(start_header)
@@ -342,6 +349,7 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
 
     #If we know that payload of record contains a certain word
     # payloads_patterns = r'(?<=.*\x68\x74\x74\x70.*)' #http
+    # payloads_patterns = r'(?<=.*\x43\x6f\x72\x6f\x6e\x61\x76\x69\x72\x75\x73.*)' #coronavirus
     # for i in range(len(headers_patterns)):
     #     headers_patterns[i].extend(payloads_patterns)
 
@@ -581,7 +589,6 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
     file.seek(b)
     #For each length of each type
     for l in ((unknown_header)[z:]):
-        
         #Read bytes for that length and decode it according to encoding : e.g. [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] --> read following number of bytes [0, 24, 7, 1, 0, 8, 0]
         payload_field = file.read(l)
         #Append to payload content list : e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
@@ -603,6 +610,19 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
                     payload[n] = 0
                 elif unknown_header_2[z+n] == 9:
                     payload[n] = 1
+            except IndexError:
+                pass
+        elif i == 'numeric_date' or i == 'numeric_date_not_null':
+            try:
+                if unknown_header_2[z+n] == 4:
+                    payload[n] = int.from_bytes(payload[n], byteorder='big', signed=False)
+                else:
+                    try:
+                        payload[n] = payload[n].decode('utf-8', errors='ignore')
+                        payload[n] = payload[n].replace("'", " ")
+                        payload[n] = payload[n].replace("--", "  ")
+                    except IndexError:
+                        pass
             except IndexError:
                 pass
         else:
@@ -742,7 +762,6 @@ for configfile in args.config:
     starts_headers_s1 = []
 
     build_regex(header_pattern_s1, headers_patterns_s1, list_fields_s1, lists_fields_s1, regex_constructs_s1, tables_regexes_s1, starts_headers_s1, scenario=1, freeblock=True, type1=True)
-
 
     header_pattern_s2 = []
     headers_patterns_s2 = []
