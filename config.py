@@ -210,6 +210,17 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
     #Return possible headers without filtering on payload length = sum of types, return limit to know number of start header bytes
     return unknown_header, limit
 
+#Answer to default mode or not
+def default_mode(answer):
+    if isinstance(answer, bool):
+        return(answer)
+    elif answer.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif answer.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 
 def default_table(dictionary, name):
@@ -233,18 +244,23 @@ def default_table(dictionary, name):
                 config.append(default_dict)
             else:
                 break
-         
+       
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--filename", nargs='+')
-parser.add_argument("--output")
+
+parser.add_argument("--input", nargs='+', help='Provide the database from which you want to extract the schema.')
+parser.add_argument("--default", type=default_mode, nargs='?', default=False, help='Do you want extra tables without last 3 DEFAULT values? True/False')
+parser.add_argument("--output", nargs='?', help='Where do you want to save your config file(s)?')
+
 args = parser.parse_args()
+
+default = default_mode(args.default)
 
 
 db_files = []
 db_paths = []
-for file_name in args.filename:
+for file_name in args.input:
     if os.path.isdir(file_name):
         for parent, dirnames, filenames in os.walk(file_name):
             for fn in filenames:
@@ -507,18 +523,19 @@ for db_file in db_files:
                                 field_list_config.append(type_)
                         
 
-                        #For tables with > 6 columns, add DEFAULT NULL at the 3 last columns if they don't already contain a DEFAULT or a NOT NULL condition
-                        #This is to handle versions of the tables that just add columns afterwards and old records that have less columns take their default value...
-                        if len(field_list_config) >= 12 :
-                            if 'DEFAULT' not in field_list_config[-1]:
-                                if 'NOT NULL' not in field_list_config[-1]:
-                                    field_list_config[-1] += ' DEFAULT NULL'
-                            if 'DEFAULT' not in field_list_config[-3]:
-                                if 'NOT NULL' not in field_list_config[-3]:
-                                    field_list_config[-3] += ' DEFAULT NULL'
-                            if 'DEFAULT' not in field_list_config[-5]:
-                                if 'NOT NULL' not in field_list_config[-5]:
-                                    field_list_config[-5] += ' DEFAULT NULL'
+                        if default:
+                            #For tables with > 6 columns, add DEFAULT NULL at the 3 last columns if they don't already contain a DEFAULT or a NOT NULL condition
+                            #This is to handle versions of the tables that just add columns afterwards and old records that have less columns take their default value...
+                            if len(field_list_config) >= 12 :
+                                if 'DEFAULT' not in field_list_config[-1]:
+                                    if 'NOT NULL' not in field_list_config[-1]:
+                                        field_list_config[-1] += ' DEFAULT NULL'
+                                if 'DEFAULT' not in field_list_config[-3]:
+                                    if 'NOT NULL' not in field_list_config[-3]:
+                                        field_list_config[-3] += ' DEFAULT NULL'
+                                if 'DEFAULT' not in field_list_config[-5]:
+                                    if 'NOT NULL' not in field_list_config[-5]:
+                                        field_list_config[-5] += ' DEFAULT NULL'
 
                         
                         dict_transf_config = {field_list_config[i]: field_list_config[i + 1] for i in range(0, len(field_list_config), 2)}
@@ -528,6 +545,7 @@ for db_file in db_files:
                         #Append list with table_name, fields to config file
                         if fields_lists_config not in config:
                             config.append(fields_lists_config)
+
 
             #Table_name + '_copy' if two tables share the same name in schema
             keys_copies = {}
@@ -545,28 +563,28 @@ for db_file in db_files:
                                 b[value] = b[key1]
                                 del b[key]
             
-            keys_default = {}
-
-
-            #Default case : take out 3 last default for tables > 6 columns and create new tables, potential old versions
-            name = '_default_0'
-            z = 1
-            x = len(config)
-            default_table(config[z:], name)
-            name = '_1'
-            y = len(config)
-            if y == x:
-                pass
-            default_table(config[x:], name)
-            name = '_2'
-            w = len(config)
-            if w == y:
-                pass
-            default_table(config[y:], name)
-            name = '_3'
-            v = len(config)
-            if v == w:
-                pass
+            
+            if default:
+                #Default case : take out 3 last default for tables > 6 columns and create new tables, potential old versions
+                keys_default = {}
+                name = '_default_0'
+                z = 1
+                x = len(config)
+                default_table(config[z:], name)
+                name = '_1'
+                y = len(config)
+                if y == x:
+                    pass
+                default_table(config[x:], name)
+                name = '_2'
+                w = len(config)
+                if w == y:
+                    pass
+                default_table(config[y:], name)
+                name = '_3'
+                v = len(config)
+                if v == w:
+                    pass
 
             
             #Create new db if already exists

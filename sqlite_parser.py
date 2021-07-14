@@ -1,6 +1,7 @@
 #!/usr/bin/python3
-import argparse, os, struct, json, mmap, sqlite3
+import argparse, os, struct, json, mmap, sqlite3, copy
 import regex as re
+from ast import literal_eval
 
 
 
@@ -30,16 +31,18 @@ blob_not_null = r'((([\x81-\xff]{1,3})([\x00|\x02|\x04|\x06|\x08|\x0a|\x0c|\x0e|
 
 
 
-# #Regexes payload content
-# nothing = r''
-# strings = r'((?<=[\x20-\xff])*)'
-# strings_not_null = r'((?<=[\x20-\xff])+)'
-# numbers = r'((?<=[\x00-\xff]){0,9})'
-# numbers_not_null = r'((?<=[\x00-\xff]){1,9})'
-# floating = r'((?<=\'\')|(?<=[\x00-\xff]){8})'
-# floating_not_null = r'((?<=[\x00-\xff]){8})'
-# everything = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])*)'
-# everything_not_null = r'(^(?!.+\x00{10,}.+)(?<=[\x00-\xff])+)'
+#Regexes payload content : "lookahead assertion"
+#(?=...) Matches if ... matches next, but doesn’t consume any of the string. 
+#This is called a lookahead assertion. For example, Isaac (?=Asimov) will match 'Isaac ' only if it’s followed by 'Asimov'.
+nothing = r''
+strings = r'([\x20-\xff]*)'
+strings_not_null = r'([\x20-\xff]+)'
+numbers = r'([\x00-\xff]{0,9})'
+numbers_not_null = r'([\x00-\xff]{1,9})'
+floating = r'((\'\')|([\x00-\xff]{8}))'
+floating_not_null = r'([\x00-\xff]{8})'
+everything = r'(^(?!.+\x00{10,}.+)([\x00-\xff]*))'
+everything_not_null = r'(^(?!.+\x00{10,}.+)([\x00-\xff]+))'
 
 
 types_list = ['zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null', 
@@ -56,9 +59,9 @@ dict_types = {'zero':zero, 'integer':integer, 'integer_not_null':integer_not_nul
 'real':real, 'real_not_null':real_not_null, 'blob':blob, 'blob_not_null':blob_not_null, 'text':text, 'text_not_null':text_not_null,
 'numeric_date':numeric_date, 'numeric_date_not_null':numeric_date_not_null, 'numeric':numeric, 'numeric_not_null':numeric_not_null}
 
-# dict_payload = {'zero':nothing, 'integer':numbers, 'integer_not_null':numbers_not_null, 'boolean':nothing, 'boolean_not_null':nothing,
-# 'real':floating, 'real_not_null':floating_not_null, 'blob':everything, 'blob_not_null':everything_not_null, 'text':strings, 
-# 'text_not_null':strings_not_null, 'numeric':everything, 'numeric_not_null':everything_not_null}
+dict_payload = {'zero':nothing, 'integer':numbers, 'integer_not_null':numbers_not_null, 'boolean':nothing, 'boolean_not_null':nothing,
+'real':floating, 'real_not_null':floating_not_null, 'blob':everything, 'blob_not_null':everything_not_null, 'text':strings, 'text_not_null':strings_not_null, 
+'numeric':everything, 'numeric_not_null':everything_not_null, 'numeric_date':everything, 'numeric_date_not_null':everything_not_null}
 
 
 
@@ -113,7 +116,7 @@ def regex_types(fields_types_):
 
 
 #Function that builds regexes for each table, concatenating regexes of header of record + regexes of each column
-def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario, freeblock=bool, type1=bool): #payloads_patterns
+def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario, freeblock=bool, type1=bool):
     
     headers_patterns_copy = []
     j=0
@@ -137,8 +140,8 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
         headers_patterns.append(header_pattern)
         header_pattern_copy = header_pattern.copy()
         headers_patterns_copy.append(header_pattern_copy)
-        # payload_pattern = header_pattern.copy()
-        # payloads_patterns.append(payload_pattern)
+        payload_pattern = copy.deepcopy(header_pattern)
+        payloads_patterns.append(payload_pattern)
         #Empty list to go to next table
         header_pattern = []
 
@@ -338,21 +341,30 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
             start_header = '(' + payload_min_max[index] + row_id + array_min_max[index] + ')'
             starts_headers.append(start_header)
 
-    # for payload_pattern in payloads_patterns:
-    #     for n,i in enumerate(payload_pattern):
-    #         for k,v in dict_payload.items():
-    #             if i == k:
-    #                 payload_pattern[n] = v
-    #     payload_pattern.insert(0, '(')
-    #     payload_pattern.insert(len(payload_pattern), ')')
-
-
+    
     #If we know that payload of record contains a certain word
     # payloads_patterns = r'(?<=.*\x68\x74\x74\x70.*)' #http
     # payloads_patterns = r'(?<=.*\x43\x6f\x72\x6f\x6e\x61\x76\x69\x72\x75\x73.*)' #coronavirus
-    # for i in range(len(headers_patterns)):
-    #     headers_patterns[i].extend(payloads_patterns)
 
+    for payload_pattern in payloads_patterns:
+        if args.keyword:
+            hex_str = args.keyword.encode('utf-8')
+            hex_str = hex_str.hex()
+            hex_str = '\\x'.join(a+b for a,b in zip(hex_str[::2], hex_str[1::2]))
+            hex_str = '\\x' + str(hex_str)
+            hex_str = literal_eval(("'%s'"%hex_str))
+            payload_pattern.clear()
+            payload_pattern.append(rf'.*{hex_str}.*')
+        else:
+            for n,i in enumerate(payload_pattern):
+                for k,v in dict_payload.items():
+                    if i == k:
+                        payload_pattern[n] = v
+        payload_pattern.insert(0, '(?=(')
+        payload_pattern.insert(len(payload_pattern), '))')
+    
+    for i in range(len(headers_patterns)):
+        headers_patterns[i].extend(payloads_patterns[i])
 
     #For each header pattern, add start of header [payload length, rowid and types length] (or freeblock) before list of types --> [payload length, rowid, types length, type1, type2, etc.]
     for header_pattern in headers_patterns:
@@ -652,7 +664,6 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
 
     connection = sqlite3.connect(output_db)
     cursor = connection.cursor()
-    
 
     statement = "INSERT INTO" + " " + table + str(tuple(fields_regex[0])) + " VALUES " + str(tuple(payload))
     statement = statement.replace('[', '')
@@ -660,7 +671,13 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
     
     if len(fields_regex[0]) == len(payload):
         try:
-            cursor.execute(statement)
+            if args.keyword:
+                if args.keyword in statement:
+                    cursor.execute(statement)
+                else:
+                    pass
+            else:
+                cursor.execute(statement)
         except:
             print('Exception : ', statement)
             pass
@@ -673,9 +690,10 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config", nargs='+')
-parser.add_argument("--main_file", nargs='+')
-parser.add_argument("--output")
+parser.add_argument("--config", nargs='+', help='Provide the config_dbname.json file generated by config.py, containing the main db schema.')
+parser.add_argument("--input", nargs='+', help='Provide all the files in which you want to search for records.')
+parser.add_argument("--keyword", nargs='?', required=False, help='Retrieve only records containing a certain word, e.g. --keyword http')
+parser.add_argument("--output", nargs='?', help='Where do you want to save your output database file?')
 args = parser.parse_args()
 
 
@@ -748,6 +766,7 @@ for configfile in args.config:
 
     header_pattern = []
     headers_patterns = []
+    payloads_patterns = []
     regex_constructs = []
     tables_regexes = []
     list_fields = []
@@ -755,69 +774,74 @@ for configfile in args.config:
     starts_headers = []
 
 
-    build_regex(header_pattern, headers_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario=0, freeblock=False, type1=False) #payloads_patterns
+    build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields, lists_fields, regex_constructs, tables_regexes, starts_headers, scenario=0, freeblock=False, type1=False)
 
 
 
     header_pattern_s1 = []
     headers_patterns_s1 = []
+    payloads_patterns_s1 = []
     regex_constructs_s1 = []
     tables_regexes_s1 = []
     list_fields_s1 = []
     lists_fields_s1 = []
     starts_headers_s1 = []
 
-    build_regex(header_pattern_s1, headers_patterns_s1, list_fields_s1, lists_fields_s1, regex_constructs_s1, tables_regexes_s1, starts_headers_s1, scenario=1, freeblock=True, type1=True)
+    build_regex(header_pattern_s1, headers_patterns_s1, payloads_patterns_s1, list_fields_s1, lists_fields_s1, regex_constructs_s1, tables_regexes_s1, starts_headers_s1, scenario=1, freeblock=True, type1=True)
 
     header_pattern_s2 = []
     headers_patterns_s2 = []
+    payloads_patterns_s2 = []
     regex_constructs_s2 = []
     tables_regexes_s2 = []
     list_fields_s2 = []
     lists_fields_s2 = []
     starts_headers_s2 = []
 
-    build_regex(header_pattern_s2, headers_patterns_s2, list_fields_s2, lists_fields_s2, regex_constructs_s2, tables_regexes_s2, starts_headers_s2, scenario=2, freeblock=True, type1=False)
+    build_regex(header_pattern_s2, headers_patterns_s2, payloads_patterns_s2, list_fields_s2, lists_fields_s2, regex_constructs_s2, tables_regexes_s2, starts_headers_s2, scenario=2, freeblock=True, type1=False)
 
 
     header_pattern_s3 = []
     headers_patterns_s3 = []
+    payloads_patterns_s3 = []
     regex_constructs_s3 = []
     tables_regexes_s3 = []
     list_fields_s3 = []
     lists_fields_s3 = []
     starts_headers_s3 = []
 
-    build_regex(header_pattern_s3, headers_patterns_s3, list_fields_s3, lists_fields_s3, regex_constructs_s3, tables_regexes_s3, starts_headers_s3, scenario=3, freeblock=True, type1=False)
+    build_regex(header_pattern_s3, headers_patterns_s3, payloads_patterns_s3, list_fields_s3, lists_fields_s3, regex_constructs_s3, tables_regexes_s3, starts_headers_s3, scenario=3, freeblock=True, type1=False)
 
 
     header_pattern_s4 = []
     headers_patterns_s4 = []
+    payloads_patterns_s4 = []
     regex_constructs_s4 = []
     tables_regexes_s4 = []
     list_fields_s4 = []
     lists_fields_s4 = []
     starts_headers_s4 = []
 
-    build_regex(header_pattern_s4, headers_patterns_s4, list_fields_s4, lists_fields_s4, regex_constructs_s4, tables_regexes_s4, starts_headers_s4, scenario=4, freeblock=True, type1=False)
+    build_regex(header_pattern_s4, headers_patterns_s4, payloads_patterns_s4, list_fields_s4, lists_fields_s4, regex_constructs_s4, tables_regexes_s4, starts_headers_s4, scenario=4, freeblock=True, type1=False)
 
 
     header_pattern_s5 = []
     headers_patterns_s5 = []
+    payloads_patterns_s5 = []
     regex_constructs_s5 = []
     tables_regexes_s5 = []
     list_fields_s5 = []
     lists_fields_s5 = []
     starts_headers_s5 = []
 
-    build_regex(header_pattern_s5, headers_patterns_s5, list_fields_s5, lists_fields_s5, regex_constructs_s5, tables_regexes_s5, starts_headers_s5, scenario=5, freeblock=True, type1=False)
+    build_regex(header_pattern_s5, headers_patterns_s5, payloads_patterns_s5, list_fields_s5, lists_fields_s5, regex_constructs_s5, tables_regexes_s5, starts_headers_s5, scenario=5, freeblock=True, type1=False)
 
 
 
 
     main_files = []
     main_files_paths = []
-    for mainfile in args.main_file:
+    for mainfile in args.input:
         if os.path.isdir(mainfile):
             for parent, dirnames, filenames in os.walk(mainfile):
                 for fn in filenames:
@@ -844,6 +868,7 @@ for configfile in args.config:
         #Open db file (or other file) in binary format for reading
         with open(open_file, 'r+b') as file:
             #mmap: instead of file.read() or file.readlines(), also works for big files, file content is internally loaded from disk as needed
+            #performance improvement
             mm = mmap.mmap(file.fileno(), 0)
 
 
@@ -876,7 +901,7 @@ for configfile in args.config:
                             payload = []
                             #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
                             if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]) and (len(unknown_header) > 3):
-                                record_infos_0 = 'Scenario 0 : non-deleted or WAL/journal/slack records'
+                                record_infos_0 = 'Scenario 0 : non-deleted or non-overwritten (WAL/journal files) records'
                                 record_infos_1 = str(a)
                                 record_infos_2 = str(mainfile)
                                 decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, z=3)
@@ -1016,6 +1041,7 @@ for configfile in args.config:
                         a = match_s4.start()
                         b = match_s4.end()
                         file.seek(a)
+
                         decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, scenario=4, freeblock=True)
 
                         if not limit_s4:

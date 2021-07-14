@@ -3,7 +3,7 @@
 **1) Create config.json file(s):**
 
         ````bash
-        config.py --filename /path/to/database_file(s)_OR_directory_of_files --output /path/to/output/folder
+        config.py --input /path/to/database_file(s)_OR_directory_of_files --output /path/to/output/folder
         ````
 
 --> Provide database(s) to retrieve its/their schema
@@ -15,18 +15,18 @@
 
 Examples:
 
-    config.py --filename directory --output ./
+    config.py --input directory --output ./
 
-    config.py --filename mmssms.db --output ./
+    config.py --input mmssms.db --output ./
 
-    config.py --filename mmssms.db snap.db --output ./
+    config.py --input mmssms.db snap.db --output ./
 
 
 
 **2) Write records to output database(s):**
 
         ````bash
-        sqlite_parser.py --config /path/to/every/config/file --main_file /path/to/database_file(s)_OR_directory_of_files --output /path/to/output/folder
+        sqlite_parser.py --config /path/to/every/config/file --input /path/to/database_file(s)_OR_directory_of_files --output /path/to/output/folder
         ````
 
 --> Provide every config.json file that was created at step 1)
@@ -36,10 +36,10 @@ Examples:
 
 Examples:
     
-    sqlite_parser.py --config config_mmssms.db --main_file mmssms.db --output ./
+    sqlite_parser.py --config config_mmssms.db --input mmssms.db --output ./
     
-    sqlite_parser.py --config config_mmssms.db --main_file mmssms.db mmssms.db-journal mmssms.db-journal-slack mmssms.db-wal --output ./
+    sqlite_parser.py --config config_mmssms.db --input mmssms.db mmssms.db-journal mmssms.db-journal-slack mmssms.db-wal --output ./
     
-    sqlite_parser.py --config config_mmssms.db config_snap.db --main_file directory --output ./
+    sqlite_parser.py --config config_mmssms.db config_snap.db --input directory --output ./
     (here a directory that contains for example journal/WAL/slack files for mmssms.db and for snap.db)
 
