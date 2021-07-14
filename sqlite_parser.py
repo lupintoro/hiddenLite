@@ -382,7 +382,10 @@ def build_regex(header_pattern, headers_patterns, list_fields, lists_fields, reg
     for i in range(len(regex_constructs)):
         table_regex = {tables_names[i]:[lists_fields[i], headers_patterns_copy[i], regex_constructs[i]]}
         for table, fields_regex in table_regex.items():
-            fields_regex[0].insert(0, 'record_infos')
+            fields_regex[0].insert(0, 'carved_record_file')
+            fields_regex[0].insert(0, 'carved_record_offset')
+            fields_regex[0].insert(0, 'carving_scenario_number')
+
         tables_regexes.append(table_regex)
 
     return tables_regexes
@@ -584,7 +587,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
 
 
 
-def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z):
+def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, z):
     #Go to the end of the match to start reading payload content that comes just after header
     file.seek(b)
     #For each length of each type
@@ -637,7 +640,9 @@ def decode_record(output_db, table, b, payload, unknown_header, unknown_header_2
     if (len(unknown_header) > 3) and (unknown_header[3] == 0):
         payload[0] = unknown_header[1]
 
-    payload.insert(0, record_infos)
+    payload.insert(0, record_infos_2)
+    payload.insert(0, record_infos_1)
+    payload.insert(0, record_infos_0)
 
     for element in payload:
         if isinstance(element, bytes):
@@ -696,7 +701,7 @@ for configfile in args.config:
             statement = statement.replace('"', '')
             statement = statement.replace(':', '')
             statement = statement.replace('INTEGER PRIMARY KEY', 'INTEGER')
-            statement = statement.replace('{', '(record_id INTEGER PRIMARY KEY AUTOINCREMENT, record_infos TEXT, ')
+            statement = statement.replace('{', '(carved_record_id INTEGER PRIMARY KEY AUTOINCREMENT, carving_scenario_number TEXT, carved_record_offset INTEGER, carved_record_file TEXT, ')
             
             final_statement = 'CREATE TABLE ' + key + ' ' + statement
         
@@ -871,8 +876,10 @@ for configfile in args.config:
                             payload = []
                             #Filter: if payload length = sum of types in serial types array AND types not all = 0 AND serial types length = types length
                             if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]) and (len(unknown_header) > 3):
-                                record_infos = 'scenario 0, offset: ' + str(a) + ' ' + str(mainfile) 
-                                decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos, z=3)
+                                record_infos_0 = 'Scenario 0 : non-deleted or WAL/journal/slack records'
+                                record_infos_1 = str(a)
+                                record_infos_2 = str(mainfile)
+                                decode_record(output_db, table, b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, z=3)
                                 
                                 #print('SCENARIO 0 :', table, unknown_header, payload, '\n\n')
 
@@ -909,8 +916,10 @@ for configfile in args.config:
                                     #Insert it on third place on header because it's type1 after freeblock
                                     unknown_header_s1.insert(2, x)
 
-                                    record_infos = 'scenario 1, offset: ' + str(a) + ' ' + str(mainfile)
-                                    decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                                    record_infos_0 = 'Scenario 1 : deleted records overwritten until type 2'
+                                    record_infos_1 = str(a)
+                                    record_infos_2 = str(mainfile)
+                                    decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, z=2)
                                     #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
 
 
@@ -921,8 +930,10 @@ for configfile in args.config:
                                     #Insert it on third place on header because it's type1 after freeblock
                                     unknown_header_s1.insert(2, x)   
 
-                                    record_infos = 'scenario 1, offset: ' + str(a) + ' ' + str(mainfile)
-                                    decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos, z=2)
+                                    record_infos_0 = 'Scenario 1 : deleted records overwritten until type 2'
+                                    record_infos_1 = str(a)
+                                    record_infos_2 = str(mainfile)
+                                    decode_record(output_db, table_s1, b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, z=2)
                                     #print('SCENARIO 1 :', table_s1, unknown_header_s1, payload_s1, '\n\n')
                                     
 
@@ -952,8 +963,10 @@ for configfile in args.config:
                             #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
                             if (((somme(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((somme(unknown_header_s2[2:]) != 0))):
 
-                                record_infos = 'scenario 2, offset: ' + str(a) + ' ' + str(mainfile)
-                                decode_record(output_db, table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos, z=2)
+                                record_infos_0 = 'Scenario 2 : deleted records overwritten until type 1'
+                                record_infos_1 = str(a)
+                                record_infos_2 = str(mainfile)
+                                decode_record(output_db, table_s2, b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos_0, record_infos_1, record_infos_2, z=2)
                                 #print('SCENARIO 2: ', table_s2, unknown_header_s2, payload_s2, '\n\n')
 
 
@@ -982,8 +995,10 @@ for configfile in args.config:
                             #WARNING: false positives with 1 and 2-columns headers that can easily match
                             #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
                             if (((somme(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((somme(unknown_header_s3[2:]) != 0)) and (b-a-limit_s3[0]+1 == unknown_header_s3[2]) and (len(unknown_header_s3) > 3)):
-                                record_infos = 'scenario 3, offset: ' + str(a) + ' ' + str(mainfile)
-                                decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos, z=3)
+                                record_infos_0 = 'Scenario 3 : deleted records overwritten until serial types array length'
+                                record_infos_1 = str(a)
+                                record_infos_2 = str(mainfile)
+                                decode_record(output_db, table_s3, b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos_0, record_infos_1, record_infos_2, z=3)
                                 #print('SCENARIO 3: ', table_s3, unknown_header_s3, payload_s3, '\n\n')
             
 
@@ -1010,8 +1025,10 @@ for configfile in args.config:
                             #We assume serial types array length cannot be > 2 bytes, otherwise too much columns, so here 1 byte is overwritten, 1 not
                             #If second part of serial types array length is less than 128 and if sum of bytes of header and sum of types equal to freeblock length and if sum of types not equal to 0
                             if ((unknown_header_s4[2] < 128) and ((somme(unknown_header_s4[3:]) + (b-a+1)) == (unknown_header_s4[1])) and ((somme(unknown_header_s4[3:]) != 0)) and (len(unknown_header_s4) > 3)):
-                                record_infos = 'scenario 4, offset: ' + str(a) + ' ' + str(mainfile)
-                                decode_record(output_db, table_s4, b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos, z=3)
+                                record_infos_0 = 'Scenario 4 : deleted records overwritten until part of serial types array length'
+                                record_infos_1 = str(a)
+                                record_infos_2 = str(mainfile)
+                                decode_record(output_db, table_s4, b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos_0, record_infos_1, record_infos_2, z=3)
                                 #print('SCENARIO 4: ', table_s4, unknown_header_s4, payload_s4, '\n\n')
             
 
@@ -1043,8 +1060,10 @@ for configfile in args.config:
                             payload_s5 = []
                             #If sum of type + bytes of match = length of freeblock AND sum of types not equal to 0
                             if (((somme(unknown_header_s5[4:]) + unknown_header_s5[3] + 4 + (b-a+1-4-unknown_header_s5[3])) == (unknown_header_s5[1])) and ((somme(unknown_header_s5[2:]) != 0)) and (len(unknown_header_s5) > 4)):
-                                record_infos = 'scenario 5, offset: ' + str(a) + ' ' + str(mainfile)
-                                decode_record(output_db, table_s5, b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos, z=3)
+                                record_infos_0 = 'Scenario 5 : deleted records overwritten until part of rowid'
+                                record_infos_1 = str(a)
+                                record_infos_2 = str(mainfile)
+                                decode_record(output_db, table_s5, b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos_0, record_infos_1, record_infos_2, z=3)
                                 #print('SCENARIO 5: ', table_s5, unknown_header_s5, payload_s5, '\n\n')
 
 

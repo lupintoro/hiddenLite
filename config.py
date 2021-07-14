@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import argparse, os, struct, json, mmap, itertools, copy
-from multiprocessing.connection import wait
 import regex as re
 
 
@@ -557,17 +556,17 @@ for db_file in db_files:
             name = '_1'
             y = len(config)
             if y == x:
-                break
+                pass
             default_table(config[x:], name)
             name = '_2'
             w = len(config)
             if w == y:
-                break
+                pass
             default_table(config[y:], name)
             name = '_3'
             v = len(config)
             if v == w:
-                break
+                pass
 
             
             #Create new db if already exists
