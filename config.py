@@ -14,13 +14,6 @@ types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT)(?!.*N
 '((DATE)(?!.*NO.*NULL))':'DATETIME', '((DATE)(.*NO.*NULL))':'DATETIME NOT NULL'}
 
 
-#To sum elements in list
-def somme(liste):
-    _somme = 0
-    for i in liste:
-        _somme = _somme + i
-    return _somme
-
 
 
 #To decode Huffman coding
@@ -365,7 +358,7 @@ for db_file in db_files:
 
                 payload = []
                 #Filter: if we have at least a payload length, rowid, types length and 1 type AND that payload length = sum of types and serial types array AND types not all = 0
-                if ((unknown_header[0] == somme(unknown_header[2:]))) and (somme(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
+                if ((unknown_header[0] == sum(unknown_header[2:]))) and (sum(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]):
                     #Go to the end of the match to start reading payload content
                     file.seek(b)
                     #For each length of each type
