@@ -3,46 +3,61 @@
 **1) Create config.json file(s):**
 
         ````bash
-        config.py --input /path/to/database_file(s)_OR_directory_of_files --default True/False (default False) --output /path/to/output/folder
+        config.py --input /path/to/database_file(s)_OR_directory_of_files --default True/False (False by default) --output /path/to/output/folder
         ````
 
---> Provide database(s) to retrieve its/their schema
+--input: provide database(s) to retrieve its/their schema (if directory, can contain all sort of files, not only databases)
 
---> Directory can contain all sort of files
+--default: create extra tables without last 1,2,3 columns in case of table update (e.g. application update, table has more columns, old records keep their old structure)
 
---> Possible to correct schema errors in config.json file before running sqlite_parser.py
+--output: path to store config.json file(s)
+
+--> Possible to correct schema errors in the config.json file before running sqlite_parser.py or to remove tables that are not of interest
+
 
 
 Examples:
 
     config.py --input directory --default False --output ./
 
-    config.py --input mmssms.db --default False --output ./
+    config.py --input mmssms.db --default True --output ./
 
     config.py --input mmssms.db snap.db --default False --output ./
+
+
 
 
 
 **2) Write records to output database(s):**
 
         ````bash
-        sqlite_parser.py --config /path/to/config_file(s)_OR_directory_of_files --input /path/to/database_file(s)_OR_directory_of_files --keyword [not required] --output /path/to/output/folder
+        sqlite_parser.py --config /path/to/config_file(s)_OR_directory_of_files --input /path/to/database_file(s)_OR_directory_of_files --linked True/False (True by default) --keyword example (not required) --output /path/to/output/folder
         ````
 
---> Provide every config.json file that was created at step 1)
+--config: provide every config.json file or a directory of config.json files that was/were created at step 1)
 
---> Provide all file or directory of interest, e.g. WAL/journal/slack files, many databases with same schema, a directory with files of interest that have the same schema as in the config.json files
+--input: provide all file(s) or directory of interest to parse 
+(e.g. WAL/journal files, many databases with same schema, a directory with files that have the same schema or with any sort of files)
+
+--linked: parse only files that are linked to the database used to create config.json file (True) or all sort of files (False)
+
+--keyword: only parses records containing the keyword (case sensitive keyword searching, e.g. http)
+
+--output: path to store output.db file(s)
+
 
 
 Examples:
     
     sqlite_parser.py --config config_mmssms.db --input mmssms.db --keyword SMS --output ./
+    (here input file is already linked to initial database)
     
-    sqlite_parser.py --config config_mmssms.db --input mmssms.db mmssms.db-journal mmssms.db-journal-slack mmssms.db-wal --output ./
+    sqlite_parser.py --config config_mmssms.db --input mmssms.db mmssms.db-journal mmssms.db-wal --keyword sms --output ./
+    (here input files are already linked to initial database)
 
-    sqlite_parser.py --config config_mmssms.db config_snap.db --input directory --output ./
-    --> directory that contains for example db/journal/WAL/slack files associated with mmssms.db and for snap.db
+    sqlite_parser.py --config config_mmssms.db config_snap.db --input directory --linked False --output ./
+    (here parsing will be done in all files in the directory)
 
     sqlite_parser.py --config directory1 --input directory2 --output ./
-    --> directory1 that contains the config.json files of interest --> can contain other files 
-    --> directory2 that contains for example db/journal/WAL/slack files associated with databases used to create the config.json files provided in directory1
+    (directory1 contains config.json files of interest --> can contain other files)
+    (directory2 contains files linked with the initial database)

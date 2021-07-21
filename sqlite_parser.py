@@ -15,8 +15,8 @@ integer_not_null = r'(([\x01-\x06]|[\x08-\x09]){1})'
 boolean = r'(([\x00]|[\x08]|[\x09]){1})'
 boolean_not_null = r'(([\x08]|[\x09]){1})'
 
-real = r'(([\x00]|[\x07]){1})'
-real_not_null = r'([\x07]{1})'
+real = r'([\x00-\x09]{1})'
+real_not_null = r'([\x00-\x09]{1})'
 
 text = r'((([\x81-\xff]{1,8})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x00|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
 text_not_null = r'((([\x81-\xff]{1,8})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
@@ -38,8 +38,8 @@ strings = r'([\x20-\xff]*)'
 strings_not_null = r'([\x20-\xff]+)'
 numbers = r'([\x00-\xff]{0,9})'
 numbers_not_null = r'([\x00-\xff]{1,9})'
-floating = r'([\x00-\xff]{0}|[\x00-\xff]{8})'
-floating_not_null = r'([\x00-\xff]{8})'
+floating = r'([\x00-\xff]{0,9})'
+floating_not_null = r'([\x00-\xff]{1,9})'
 everything = r'([\x00-\xff]*)'
 everything_not_null = r'([\x00-\xff]+)'
 
@@ -55,8 +55,8 @@ types_sub = {'(INTEGER PRIMARY KEY)':'zero', '((INT)(?!.*NO.*NULL))':'integer', 
 '((DATE)(?!.*NO.*NULL))':'numeric_date', '((DATE)(.*NO.*NULL))':'numeric_date_not_null'}
 
 #After conversion of types, if there is still an unknown type (not on this types_list) left, replace it with "numeric" or "numeric_not_null"
-types_list = ('zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null', 
-'numeric', 'numeric_not_null', 'numeric_date', 'numeric_date_not_null' 'blob', 'blob_not_null')
+types_list = ('zero', 'integer', 'integer_not_null', 'boolean', 'boolean_not_null', 'real', 'real_not_null', 'text', 'text_not_null',
+'numeric', 'numeric_not_null', 'numeric_date', 'numeric_date_not_null', 'blob', 'blob_not_null')
 
 #Replace each column type by its specific regex above
 dict_types = {'zero':zero, 'integer':integer, 'integer_not_null':integer_not_null, 'boolean':boolean, 'boolean_not_null':boolean_not_null, 
@@ -69,7 +69,7 @@ dict_payload = {'zero':nothing, 'integer':numbers, 'integer_not_null':numbers_no
 'numeric':everything, 'numeric_not_null':everything_not_null, 'numeric_date':everything, 'numeric_date_not_null':everything_not_null}
 
 #Types that have a fixed min/max size in bytes VS types which size can vary
-multiple_bytes = ('text', 'text_not_null', 'numeric_date', 'numeric_date_not_null' 'numeric' 'numeric_not_null' 'blob' 'blob_not_null')
+multiple_bytes = ('text', 'text_not_null', 'numeric_date', 'numeric_date_not_null', 'numeric', 'numeric_not_null', 'blob', 'blob_not_null')
 fixed_bytes = ('zero', 'boolean', 'boolean_not_null', 'integer', 'integer_not_null', 'real', 'real_not_null')
 
 
@@ -82,6 +82,22 @@ def huffmanEncoding(x,y):
     a = z + int(y)
     
     return(hex(a))
+
+
+
+#Function that translates argument provided as --linked
+def linked_mode(answer):
+    #If user gives a boolean argument (True/False)
+    if isinstance(answer, bool):
+        return(answer)
+    #Elif user gives another argument that can be interpreted as True/False
+    elif answer.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif answer.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    #Else it's not a valid argument
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 
@@ -270,7 +286,7 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
                 
                 #Regex for the freeblock length, with different min size according to table
                 #The maximum is 0xff, same for first byte, since freeblock is on 2-bytes --> min 00min, max ffff
-                freeblock_length = rf'([\x00-\xff]{{1}}[\x{fb_min}-\xff]{{1}})'
+                freeblock_length = rf'(([\x00-\xff]{{2}})|([\x00]{{1}}[\x{fb_min}-\xff]{{1}}))'
                 #Add the regex to a list of freeblock lengths regexes
                 freeblock_min_max.append(freeblock_length)
                 #Set min back to 4 (the minimum is 4 bytes because the freeblock itself is 4 bytes and the freeblock length counts itself)
@@ -283,6 +299,11 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
 
                 #Fill it to a "two-digits" hex number
                 count_min = format(count_min,'x').zfill(2)
+                
+                #If min > max, then min = max, otherwise false range
+                condition_min = '0x' + str(count_min)
+                if int(condition_min, 16) > 0x80:
+                    count_min = str(80)
                 
                 #Regex for the payload length, with different min size according to table
                 payload_length = rf'((([\x81-\xff]{{1,8}}[\x00-\x80]{{1}})|([\x{count_min}-\x80]{{1}})){{1}})'
@@ -315,13 +336,24 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
                 #First byte : this only handles x81 x.. cases, so until 256 columns
                 x = 129
                 #Last byte maximum (last byte minimum is 00, e.g. x81 x00 = 129)
-                y = counter_max%128
+                y = 128
                 
                 #Fill it to a "two-digits" hex number
                 counter_min = format(counter_min,'x').zfill(2)
                 counter_max = format(128,'x').zfill(2)
                 x = format(x,'x').zfill(2)
                 y = format(y,'x').zfill(2)
+
+                #If min > max, then min = max, otherwise false range
+                cond_min = '0x' + str(counter_min)
+                cond_max = '0x' + str(counter_max)
+
+                if int(cond_min, 16) > int(cond_max, 16):
+                    counter_min = counter_max
+                
+                #In scenario 4, half of the array length is overwritten --> the minimum for the eventual second byte is 00 
+                if scenario == 4:
+                    counter_min = format(0,'x').zfill(2)
 
                 #Regex for the serial types array length, with different min/may sizes according to table
                 serial_types_array_length = rf'(([\x{counter_min}-\x{counter_max}]{{1}})|([\x{x}]{{1}}[\x00-\x{y}]{{1}}))'
@@ -407,7 +439,7 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
             hex_str = literal_eval(("'%s'"%hex_str))
             #Clear the existing payload pattern and replace it by the keyword
             payload_pattern.clear()
-            payload_pattern.append(rf'.*{hex_str}.*')
+            payload_pattern.append(rf'.*{hex_str}')
         
         #If the user does not give a keyword
         else:
@@ -705,13 +737,23 @@ def decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, re
             except IndexError:
                 pass
             
-            #If in unknown_header_2 not decoded there was an 8, then it's a 0 in the record
+            #If in unknown_header_2 not decoded there was a 7, then it's a floating point
+            #If there was an 8, then it's a 0 in the record
             #If there was a 9, then it's a 1 in the record
             try:
-                if unknown_header_2[z+n] == 8:
+                
+                if unknown_header_2[z+n] == 7:
+                    #Convert to binary
+                    payload[n] = bin(payload[n])
+                    #Unpack as 8-bytes floating point
+                    payload[n] = struct.unpack('!d', struct.pack('!q', int(payload[n], 2)))[0]
+                
+                elif unknown_header_2[z+n] == 8:
                     payload[n] = 0
+                
                 elif unknown_header_2[z+n] == 9:
                     payload[n] = 1
+            
             except IndexError:
                 pass
         
@@ -765,9 +807,16 @@ def decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, re
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", nargs='+', help='Provide a config.json file generated by config.py, containing the main db schema.')
 parser.add_argument("--input", nargs='+', help='Provide all the files or a directory in which you want to search for records.')
+parser.add_argument("--linked", type=linked_mode, nargs='?', default=True, help='Parse only files linked with database used to create config.json file. True/False')
 parser.add_argument("--keyword", nargs='?', required=False, help='Retrieve only records containing a certain word, e.g. --keyword http')
 parser.add_argument("--output", nargs='?', help='Where do you want to save the output database file?')
 args = parser.parse_args()
+
+
+
+#Retrieve argument user provided for --linked
+linked = linked_mode(args.linked)
+
 
 
 #Retrieve config.json file, files or directory of files given as input
@@ -796,7 +845,7 @@ elif os.path.isfile(args.config[0]):
     args.config = args.config
 #Else, nor file nor directory
 else:
-    print("Nor file(s) nor directory", '\n\n')
+    print('\n\n', "Nor file(s) nor directory", '\n\n')
 
 
 
@@ -881,13 +930,21 @@ for configfile in args.config:
         if os.path.isdir(mainfile):
             #Look for files inside
             for parent, dirnames, filenames in os.walk(mainfile):
-                #Search for (associated) files with same name as main database name (e.g. if mmssms.db, search for mmssms.db, mmssms.db-journal, mmssms.db-journal-slack, etc.)
-                for fn in filenames:
-                    start = configfile.find('config_') + len('config_')
-                    end = configfile.find('.json')
-                    associated_file = configfile[start:end]
-                    #For each associated file, append their name to main_files list and path to main_files_paths list
-                    if associated_file in fn:
+                #If we want to search only on files linked to database used to create config.json
+                if linked:
+                    #Search for linked files with same name as main database name (e.g. if mmssms.db, search for mmssms.db, mmssms.db-journal, mmssms.db-wal, etc.)
+                    for fn in filenames:
+                        start = configfile.find('config_') + len('config_')
+                        end = configfile.find('.json')
+                        linked_file = configfile[start:end]
+                        #For each linked file, append their name to main_files list and path to main_files_paths list
+                        if linked_file in fn:
+                            filepath = os.path.join(parent, fn)
+                            main_files.append(fn)
+                            main_files_paths.append(filepath)
+                #If we want to search on all files (not only linked ones)
+                else:
+                    for fn in filenames:
                         filepath = os.path.join(parent, fn)
                         main_files.append(fn)
                         main_files_paths.append(filepath)
@@ -897,7 +954,7 @@ for configfile in args.config:
             main_files.append(mainfile)
         #Else, nor file nor directory
         else:
-            print("Nor file(s) nor directory", '\n\n')
+            print('\n\n', "Nor file(s) nor directory", '\n\n')
 
 
 
@@ -930,7 +987,7 @@ for configfile in args.config:
 
 
 
-    #For each file provided as input, associated with configfile being processed
+    #For each file provided as input
     #tqdm for progress bar per file processment, the description is the output database's name
     for mainfile in tqdm.tqdm(main_files, total=len(main_files), position=0, leave=True, desc=output_db):
         #If a directory is given as input
@@ -961,10 +1018,9 @@ for configfile in args.config:
                     
                     #Iterate over the file (mm) and search for matches
                     #Update regex module : regex 2021.4.4 : overlapped=True finds overlapping matches (match starting at an offset inside another match)
-                    matches = [match for match in re.finditer(fields_regex[2], mm, overlapped=True)]
-                    
                     #Process each match
-                    for match in matches:
+                    for match in re.finditer(fields_regex[2], mm, overlapped=True, concurrent=True):
+
                         
                         unknown_header, unknown_header_2, limit, payload = [], [], [], []
                         a = match.start()
@@ -992,13 +1048,14 @@ for configfile in args.config:
                             #If the payload length is equal to the sum of each type length plus the length of the serial types array AND the sum of all types is not equal to 0
                             #AND the serial types array length is equal to the number of bytes from the serial types array length 
                             #AND the length of the header is > 3 (payload length, rowid, serial types array length, type1)
-                            if ((unknown_header[0] == sum(unknown_header[2:]))) and (sum(unknown_header[3:]) != 0) and (b-a-limit[0]+1 == unknown_header[2]) and (len(unknown_header) > 3):
+                            if (unknown_header[0] == sum(unknown_header[2:])) and (sum(unknown_header[3:]) != 0) and (len(unknown_header) > 3) and ((b-a-limit[0]) == ((unknown_header[2]-1) or (unknown_header[2]-2))):
                                 #Then it might be a record so decode it
                                 decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, scenario=0, z=3)
                                 #If record contains the same number of columns as the table it matched with, append its insert statement to statements list
                                 if len(fields_regex[0]) == len(payload):
                                     insert_statement = "".join(["INSERT INTO", " ", table, fields_tuple, " VALUES ", str(tuple(payload))])
                                     statements.append(insert_statement)
+            print('\n', 'Finished processing scenario 0/5')
 
 
 
@@ -1007,8 +1064,7 @@ for configfile in args.config:
             """SCENARIO 1 : overwritten : payload length, rowid, serial types array length, type 1 --> record starts at type 2"""
             for table_regex_s1 in tables_regexes_s1:
                 for table_s1, fields_regex_s1 in table_regex_s1.items():
-                    matches_s1 = [match_s1 for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True)]
-                    for match_s1 in matches_s1:
+                    for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s1, unknown_header_2_s1, limit_s1, payload_s1 = [], [], [], []
                         a = match_s1.start()
@@ -1034,8 +1090,8 @@ for configfile in args.config:
                             #WARNING: more duplicates if 2 or more tables with same number of columns --> will try for each possible type1
                             #WARNING: if table has only 1 column, the whole header is overwritten and the record won't necessarily be recovered
                             
-                            #If type1 is an integer, then a number from 0-9 is missing on first position on the header (works for booleans and reals too)
-                            if (fields_regex_s1[1])[0] == 'integer' or 'integer_not_null':
+                            #If type1 is an integer or a floating, then a number from 0-9 is missing on first position on the header
+                            if (fields_regex_s1[1])[0] == 'integer' or 'integer_not_null' or 'real' or 'real_not_null':
                                 if (((sum(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1] <= (sum(unknown_header_s1[2:]) + (b-a) + 9))):
                                     #x is the unknown integer
                                     x = unknown_header_s1[1] - sum(unknown_header_s1[2:]) - (b-a)
@@ -1079,21 +1135,7 @@ for configfile in args.config:
                                     if len(fields_regex_s1[0]) == len(payload_s1):
                                         insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
                                         statements.append(insert_statement)
-
-                            
-                            #If type1 is a real (floating point), then a 7=8 is missing on first position on the header
-                            elif (fields_regex_s1[1])[0] == 'real' or 'real_not_null':
-                                if ((sum(unknown_header_s1[2:]) + (b-a+1)) == unknown_header_s1[1]):
-
-                                    x = 8
-                                    unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                    if len(fields_regex_s1[0]) == len(payload_s1):
-                                        insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                        statements.append(insert_statement)
-                  
+                
 
                             #If type1 is a blob, then an even number is missing on first position on the header
                             elif (fields_regex_s1[1])[0] == 'blob' or 'blob_not_null':
@@ -1131,16 +1173,16 @@ for configfile in args.config:
                                 if len(fields_regex_s1[0]) == len(payload_s1):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
                                     statements.append(insert_statement)
+            print('Finished processing scenario 1/5')
 
 
                                     
 
-
+            
             """SCENARIO 2 : overwritten : payload length, rowid, serial types array length --> record starts at type 1"""
             for table_regex_s2 in tables_regexes_s2:
                 for table_s2, fields_regex_s2 in table_regex_s2.items():
-                    matches_s2 = [match_s2 for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True)]
-                    for match_s2 in matches_s2:
+                    for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s2, unknown_header_2_s2, limit_s2, payload_s2 = [], [], [], []
                         a = match_s2.start()
@@ -1169,6 +1211,7 @@ for configfile in args.config:
                                 if len(fields_regex_s2[0]) == len(payload_s2):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s2, fields_tuple_s2, " VALUES ", str(tuple(payload_s2))])
                                     statements.append(insert_statement)
+            print('Finished processing scenario 2/5')
 
 
 
@@ -1177,8 +1220,7 @@ for configfile in args.config:
             """SCENARIO 3 : overwritten : payload length, rowid --> record starts at serial types array length"""
             for table_regex_s3 in tables_regexes_s3:
                 for table_s3, fields_regex_s3 in table_regex_s3.items():
-                    matches_s3 = [match_s3 for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True)]
-                    for match_s3 in matches_s3:
+                   for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s3, unknown_header_2_s3, limit_s3, payload_s3 = [], [], [], []
                         a = match_s3.start()
@@ -1192,7 +1234,7 @@ for configfile in args.config:
                         
                         file.seek(a)
                         
-                        decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=4, freeblock=True)
+                        decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
 
                         if not limit_s3:
                             pass
@@ -1206,6 +1248,7 @@ for configfile in args.config:
                                 if len(fields_regex_s3[0]) == len(payload_s3):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s3, fields_tuple_s3, " VALUES ", str(tuple(payload_s3))])
                                     statements.append(insert_statement)
+            print('Finished processing scenario 3/5')
 
 
 
@@ -1214,8 +1257,7 @@ for configfile in args.config:
             """SCENARIO 4 : overwritten : payload length, rowid, part of serial types array length --> record starts at part of serial types array length"""
             for table_regex_s4 in tables_regexes_s4:
                 for table_s4, fields_regex_s4 in table_regex_s4.items():
-                    matches_s4 = [match_s4 for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True)]
-                    for match_s4 in matches_s4:
+                  for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s4, unknown_header_2_s4, limit_s4, payload_s4 = [], [], [], []
                         a = match_s4.start()
@@ -1229,35 +1271,36 @@ for configfile in args.config:
 
                         file.seek(a)
 
-                        decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=4, freeblock=True)
+                        decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
 
                         if not limit_s4:
                             pass
                         else:
                             #We assume serial types array length cannot be > 2 bytes, otherwise too much columns, so here 1 byte is overwritten, 1 not
                             #If the second part of the serial types array length is < than 128 (if it's > 128, it's not a second part of the serial types array length)
-                            #AND the freeblock length is equal to the sum of each type length plus the length until serial types 
+                            #AND if the freeblock length is NOT equal to the sum of each type length plus the length of PART of the serial types array
+                            #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
                             #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, part of serial types array length, type1)
-                            if ((unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[4:])+limit_s4[0]-1)) and (len(unknown_header_s4) > 3)):
+                            if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1)) and (len(unknown_header_s4) > 3)):
                                 decode_record(b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos_0, record_infos_1, record_infos_2, scenario=4, z=3)
                                 
                                 if len(fields_regex_s4[0]) == len(payload_s4):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s4, fields_tuple_s4, " VALUES ", str(tuple(payload_s4))])
                                     statements.append(insert_statement)
-                
+            print('Finished processing scenario 4/5')
+
 
 
 
 
             """SCENARIO 5 : overwritten : payload length, part of rowid --> record starts at part of rowid"""
-            #This scenario also covers SCENARIO 6 if payload length is 4 bytes --> start at rowid
-            #As rowid can be anything from 1-9 bytes, starting at part of it or starting at the entire rowid does not change anything
-            #If payload length is exactly 4 bytes or more in length, the record is greater than 512MB, which is unlikely to happen
+            #This scenario also covers SCENARIO 6 : if payload length is 4 bytes --> record starts at rowid
+            #As rowid can be anything from 1-9 bytes, starting at part of it or starting at the start of rowid does not change anything
+            #If payload length is exactly 4 bytes or more in length, the record is greater than 512MB, which is rare
 
             for table_regex_s5 in tables_regexes_s5:
                 for table_s5, fields_regex_s5 in table_regex_s5.items():
-                    matches_s5 = [match_s5 for match_s5 in re.finditer(fields_regex_s5[2], mm, overlapped=True)]
-                    for match_s5 in matches_s5:
+                    for match_s5 in re.finditer(fields_regex_s5[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s5, unknown_header_2_s5, limit_s5, payload_s5 = [], [], [], []
                         a = match_s5.start()
@@ -1271,20 +1314,25 @@ for configfile in args.config:
 
                         file.seek(a)
                         
-                        decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=5, freeblock=True)
+                        decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
 
                         if not limit_s5:
                             pass
                         else:
                             #If the freeblock length is equal to the sum of each type length plus the length until serial types
                             #AND the sum of all types is not equal to 0 AND the length of the header is > 4 (next fb, actual fb, part of rowid, serial types array length, type1)
-                            if ((unknown_header_s5[1] == (sum(unknown_header_s5[3:])+limit_s5[0]-1)) and ((sum(unknown_header_s5[3:]) != 0)) and (len(unknown_header_s5) > 3)):
+                            if ((unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))) and ((sum(unknown_header_s5[3:]) != 0)) and (len(unknown_header_s5) > 3)):
 
                                 decode_record(b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos_0, record_infos_1, record_infos_2, scenario=5, z=4)
                                 
                                 if len(fields_regex_s5[0]) == len(payload_s5):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s5, fields_tuple_s5, " VALUES ", str(tuple(payload_s5))])
                                     statements.append(insert_statement)
+            print('Finished processing scenario 5/5')
+
+
+
+
 
             #Free the memory
             mm.close()
@@ -1311,7 +1359,7 @@ for configfile in args.config:
         try:
             connection.execute(create_statement)
         except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
-            print('sqlite error: ', e, '\n\n')
+            print('\n\n', 'sqlite error: ', e, '\n\n')
 
 
     #INSERT records
@@ -1324,7 +1372,7 @@ for configfile in args.config:
                 try:
                     connection.execute(final_statement)
                 except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
-                    print('sqlite error: ', e, '\n\n')
+                    print('\n\n', 'sqlite error: ', e, '\n\n')
             else:
                 pass
         #Else, insert all records
@@ -1332,7 +1380,7 @@ for configfile in args.config:
             try:
                 connection.execute(final_statement)
             except (sqlite3.OperationalError, sqlite3.IntegrityError) as e:
-                print('sqlite error: ', e, '\n\n')
+                print('\n\n', 'sqlite error: ', e, '\n\n')
 
 
     #Commit transactions and close connection to output database

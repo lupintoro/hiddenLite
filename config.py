@@ -2,7 +2,20 @@
 import argparse, os, struct, json, mmap, itertools, copy
 import regex as re
 from tqdm import tqdm
+from pathlib import Path
 
+
+
+
+#Regex of a CREATE TABLE statement, if it's intact (s0) and for each scenario (s1-5) if the table was deleted
+#E.g. CREATE TABLE (type TEXT, name TEXT, tbl_name TEXT, rootpage INTEGR, sql statement TEXT)
+#--> type is always table of length 0x17
+regex_s0 = rb'(((([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s1 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s2 = rb'((([\x00-\xff]{4})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s3 = rb'((([\x00-\xff]{4})(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s4 = rb'((([\x00-\xff]{4})([\x02-\x80]{1})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s5 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
 
 
 
@@ -250,7 +263,7 @@ def default_table(dictionary, name):
                 #Pop out last column and rename table (cannot have twice same table name)
                 for key,value in default_dict.items():
                     value.pop(list_keys[-1])
-                    element = str(key) + str(name)
+                    element = str(key[:-1]) + str(name)
                     keys_default[key] = element
                 for key,value in default_dict.copy().items():
                     for key1,value1 in keys_default.items():
@@ -303,7 +316,7 @@ for file_name in args.input:
         db_files.append(file_name)
     #Else, nor file(s) nor directory
     else:
-        print("Nor file(s) nor directory", '\n\n')
+        print('\n\n', "Nor file(s) nor directory", '\n\n')
 
 
 
@@ -331,8 +344,9 @@ for db_file in pbar:
         #Database size
         size = os.path.getsize(open_file)
         #Database name without extension
-        file_name, extension = os.path.splitext(open_file)
-        file_name = db_file.replace(extension, '')
+        file_name = Path(open_file).name
+        file_name, extension = os.path.splitext(file_name)
+        file_name = file_name.replace(extension, '')
         
         #Go to offset 0 of database
         file.seek(0)
@@ -342,7 +356,7 @@ for db_file in pbar:
         
         #If it's not an SQLite database
         if signature != b'\x53\x51\x4C\x69\x74\x65\x20\x66\x6F\x72\x6D\x61\x74\x20\x33':
-            print(str(open_file) + " is not a sqlite 3 database" + '\n\n')
+            print('\n\n' + str(open_file) + " is not a sqlite 3 database" + '\n\n')
         
         #If it's an SQLite database
         else:
@@ -412,17 +426,7 @@ for db_file in pbar:
 
 
 
-            #Regex of a CREATE TABLE statement, if it's intact (s0) and for each scenario (s1-5) if the table was deleted
-            #E.g. CREATE TABLE (type TEXT, name TEXT, tbl_name TEXT, rootpage INTEGR, sql statement TEXT)
-            #--> type is always table of length 0x17
-            regex_s0 = rb'((([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            regex_s1 = rb'(([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            regex_s2 = rb'(([\x00-\xff]{4})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            regex_s3 = rb'(([\x00-\xff]{4})(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            regex_s4 = rb'(([\x00-\xff]{4})([\x02-\x80]{1})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            regex_s5 = rb'(([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(\x74\x61\x62\x6C\x65){1}))((?=(.*\x43\x52\x45\x41\x54\x45\x20\x54\x41\x42\x4c\x45){1}))'
-            
-            #Compile each regex
+            #Compile each CREATE TABLE statement regex
             regex_s0 = re.compile(regex_s0)
             regex_s1 = re.compile(regex_s1)
             regex_s2 = re.compile(regex_s2)
@@ -494,8 +498,16 @@ for db_file in pbar:
                     for l in ((unknown_header_s1)[2:]):
                         payload_field_s1 = file.read(l).decode('utf-8', errors='ignore')
                         payload_s1.append(payload_field_s1)
-                    payloads.append(payload_s1)
-                    print('Overwritten table ', str(payload_s1[1]), ' was retrieved successfully!')
+                    
+                    for element in payloads:
+                        #If table not already in payloads, append table
+                        if element[1] != payload_s1[1]:
+                            payloads.append(payload_s1)
+
+                    #If table was added in payloads and it's a correct CREATE TABLE statement
+                    if (payload_s1 in payloads) and (str(payload_s1[1]) != '') and ('index' not in payload_s1[0]) and ('CREATE I' not in payload_s1[-1]) and ((payload_s1[-1])[0:12] == 'CREATE TABLE'):
+                        #Then notify the user that a deleted table was retrieved (records will be retrieved normally)
+                        print('Overwritten table', str(payload_s1), 'was retrieved successfully!')
 
 
 
@@ -518,8 +530,11 @@ for db_file in pbar:
                     for l in ((unknown_header_s2)[2:]):
                         payload_field_s2 = file.read(l).decode('utf-8', errors='ignore')
                         payload_s2.append(payload_field_s2)
-                    payloads.append(payload_s2)
-                    print('Overwritten table ', str(payload_s2[1]), ' was retrieved successfully!')
+                    for element in payloads:
+                        if element[1] != payload_s2[1]:
+                            payloads.append(payload_s2)
+                    if (payload_s2 in payloads) and (str(payload_s2[1]) != '') and ('index' not in payload_s2[0]) and ('CREATE I' not in payload_s2[-1]) and ((payload_s2[-1])[0:12] == 'CREATE TABLE'):
+                        print('Overwritten table', str(payload_s2), 'was retrieved successfully!')
             
 
 
@@ -532,7 +547,7 @@ for db_file in pbar:
 
                 file.seek(a)
 
-                decode_unknown_header(unknown_header_s3, a, b, limit_s3, len_start_header=4, freeblock=True)
+                decode_unknown_header(unknown_header_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
     
                 #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
                 if ((sum(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])):
@@ -542,8 +557,67 @@ for db_file in pbar:
                     for l in ((unknown_header_s3)[4:]):
                         payload_field_s3 = file.read(l).decode('utf-8', errors='ignore')
                         payload_s3.append(payload_field_s3)
-                    payloads.append(payload_s3)
-                    print('Overwritten table ', str(payload_s3[1]), ' was retrieved successfully!')
+                    for element in payloads:
+                        if element[1] != payload_s3[1]:
+                            payloads.append(payload_s3)
+                    if (payload_s3 in payloads) and  (str(payload_s3[1]) != '') and ('index' not in payload_s3[0]) and ('CREATE I' not in payload_s3[-1]) and ((payload_s3[-1])[0:12] == 'CREATE TABLE'):
+                        print('Overwritten table', str(payload_s3), 'was retrieved successfully!')
+            
+
+
+            #SCENARIO 4
+            matches_s4 = [match_s4 for match_s4 in re.finditer(regex_s4, mm, overlapped=True)]
+            for match_s4 in matches_s4:
+                unknown_header_s4, limit_s4, payload_s4 = [], [], []
+                a = match_s4.start()
+                b = match_s4.end()
+
+                file.seek(a)
+
+                decode_unknown_header(unknown_header_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
+    
+                #If the freeblock length is NOT equal to the sum of each type length plus the length of PART of the serial types array
+                #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
+                if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1))):
+                   
+                    file.seek(b)
+                    
+                    for l in ((unknown_header_s4)[3:]):
+                        payload_field_s4 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_s4.append(payload_field_s4)
+                    for element in payloads:
+                        if element[1] != payload_s4[1]:
+                            payloads.append(payload_s4)
+                    if (payload_s4 in payloads) and (str(payload_s4[1]) != '') and ('index' not in payload_s4[0]) and ('CREATE I' not in payload_s4[-1]) and ((payload_s4[-1])[0:12] == 'CREATE TABLE'):
+                        print('Overwritten table', str(payload_s4), 'was retrieved successfully!')
+             
+
+
+            #SCENARIO 5
+            matches_s5 = [match_s5 for match_s5 in re.finditer(regex_s5, mm, overlapped=True)]
+            for match_s5 in matches_s5:
+                unknown_header_s5, limit_s5, payload_s5 = [], [], []
+                a = match_s5.start()
+                b = match_s5.end()
+
+                file.seek(a)
+
+                decode_unknown_header(unknown_header_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
+    
+                #If the freeblock length is equal to the sum of each type length plus the length until serial types
+                if (unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))):
+                   
+                    file.seek(b)
+                    
+                    for l in ((unknown_header_s5)[4:]):
+                        payload_field_s5 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_s5.append(payload_field_s5)
+                    for element in payloads:
+                        if element[1] != payload_s5[1]:
+                            payloads.append(payload_s5)
+                    if (payload_s5 in payloads) and (str(payload_s5[1]) != '') and ('index' not in payload_s5[0]) and ('CREATE I' not in payload_s5[-1]) and ((payload_s5[-1])[0:12] == 'CREATE TABLE'):
+                        print('Overwritten table', str(payload_s5), 'was retrieved successfully!')
+
 
 
             #Free the memory
@@ -553,11 +627,9 @@ for db_file in pbar:
             #For each statement
             for payload in payloads:
                 #Verify that it is a CREATE TABLE table statement, and that it has no sqlite reserved table name (starting with 'sqlite_')
-                if (payload[0] == 'table') and ('CREATE TABLE' or 'create table' in payload[4]) and ('sqlite_' not in payload[4]):
-
+                if (payload[0] == 'table') and ('CREATE TABLE' or 'create table' in payload[4]) and not ('_Sqlite' in payload[1]) and not ('sqlite_' in payload[1]) and not ('SQLITE_' in payload[1]):
                     #Keep on completing config.json with table/fields information
                     table_name = payload[1]
-
 
                     #Handle table's names containing special characters
                     for i in table_name:
@@ -570,12 +642,12 @@ for db_file in pbar:
                         try:
                             fields = payload[4].split('(',1)[1]
                         except:
-                            print(str(open_file) + ' contains a non-valid SQL statement' + '\n\n')
+                            pass
                     
                     if type(table_name) == int:
                         table_name = 'special_character_' + str(table_name)
 
-
+                    
                     #Clean table's name
                     if table_name == "''":
                         table_name = '\'\''
@@ -605,6 +677,8 @@ for db_file in pbar:
                     if fields.endswith(','):
                         fields = fields[:-1]
                     
+                    #Clean end-statement conditions
+                    fields = re.sub(r'(PRIMARY KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(,PRIMARY KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(, PRIMARY KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(UNIQUE){1}( )*\({1}.+', '', fields)
@@ -648,7 +722,7 @@ for db_file in pbar:
                         if _name_[0] == '':
                             _name_ = i.partition(' ')
 
-                        #Name is before space, type after space
+                        #Name is before space, type is after space
                         name_ = _name_[0]
                         
                         #Escape unicode in names
@@ -723,8 +797,11 @@ for db_file in pbar:
 
 
                     #Remove NOT NULL from first column because it will be a 0 for rowid tables!
-                    if 'NOT NULL' in field_list_config[1]:
-                        field_list_config[1] = field_list_config[1].replace('NOT NULL', '')
+                    try:
+                        if 'NOT NULL' in field_list_config[1]:
+                            field_list_config[1] = field_list_config[1].replace('NOT NULL', '')
+                    except IndexError:
+                        pass
 
 
                     #Make a dictionary per table with a list of columns' names and fields
@@ -736,21 +813,24 @@ for db_file in pbar:
                         config.append(fields_lists_config)
 
 
-            #Make a copy of a table if two tabales share the same name in the schema : table_name + '_copy'
+            #Make a copy of a table if two tabales share the same name in the schema : table_name + '_copy' (until max 5 copies)
             keys_copies = {}
-            for a,b in itertools.combinations(config[1:],2):
-                if a.keys() == b.keys():
-                    for key,value in b.items():
-                        element = str(key) + '_copy'
-                        keys_copies[key] = element
-            for a,b in itertools.combinations(config[1:],2):
-                if a.keys() == b.keys():
-                    for key,value in keys_copies.items():
-                        for key1,value1 in b.copy().items():
-                            if key == key1:
-                                b[value] = b[key1]
-                                del b[key]
+
+            for i in range(5):
+                for a,b in itertools.combinations(config[1:],2):
+                    if a.keys() == b.keys():
+                        for key,value in b.items():
+                            element = '[' + str(key[1:-1]) + '_copy]'
+                            keys_copies[key] = element
+                for a,b in itertools.combinations(config[1:],2):
+                    if a.keys() == b.keys():
+                        for key,value in keys_copies.items():
+                            for key1,value1 in b.copy().items():
+                                if key == key1:
+                                    b[value] = b[key1]
+                                    del b[key]
         
+
         
             #If command-line argument --default True
             if default:
@@ -758,21 +838,20 @@ for db_file in pbar:
                 #E.g. table name = sms, we will have table sms, table sms_default_0 without last column of sms, 
                 #table sms_default_0_1 without last column of sms_default_0, table sms_default_0_1_2 without last column of sms_default_0_1
                 keys_default = {}
-                name = '_default_0'
+                name = '_default_0]'
                 z = 1
                 x = len(config)
                 default_table(config[z:], name)
-                name = '_1'
+                name = '_1]'
                 y = len(config)
                 if y == x:
                     pass
                 default_table(config[x:], name)
-                name = '_2'
+                name = '_2]'
                 w = len(config)
                 if w == y:
                     pass
                 default_table(config[y:], name)
-                name = '_3'
                 v = len(config)
                 if v == w:
                     pass
