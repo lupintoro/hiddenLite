@@ -2,7 +2,12 @@
 import argparse, sys, os, struct, json, mmap, sqlite3, copy, tqdm
 import regex as re
 from ast import literal_eval
+import time
 
+
+
+#To print time elapsed after each scenario processing
+start_time = time.time()
 
 
 
@@ -518,12 +523,12 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
     
     #If the record is overwritten by a freeblock, read 2 bytes (next freeblock offset) then 2 bytes (length of this freeblock)
     if freeblock:
-        byte = int(struct.unpack('>H', file.read(2))[0])
+        byte = int(struct.unpack('>H', mm.read(2))[0])
         unknown_header.append(byte)
         unknown_header_2.append(byte)
         count+=2
         
-        byte = int(struct.unpack('>H', file.read(2))[0])
+        byte = int(struct.unpack('>H', mm.read(2))[0])
         unknown_header.append(byte)
         unknown_header_2.append(byte)
         count+=2
@@ -535,21 +540,21 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
         if len(unknown_header) < len_start_header:
 
             #Read byte by byte, convert in int, and append to unknown_header list
-            byte = int(struct.unpack('>B', file.read(1))[0])
+            byte = int(struct.unpack('>B', mm.read(1))[0])
             if byte < 128:
                 unknown_header.append(byte)
                 unknown_header_2.append(byte)
                 count+=1
             #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
             else:
-                cont1 = int(struct.unpack('>B', file.read(1))[0])
+                cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
                 if cont1 < 128:
                     unknown_header.append(byte1)
                     unknown_header_2.append(byte1)
                     count+=2
                 else:
-                    cont2 = int(struct.unpack('>B', file.read(1))[0])
+                    cont2 = int(struct.unpack('>B', mm.read(1))[0])
                     byte2 = int(huffmanEncoding(byte1, cont2),16)
                     count+=2
                     if cont2 < 128:
@@ -558,7 +563,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                         count+=1
                     else:
                         count+=1
-                        cont3 = int(struct.unpack('>B', file.read(1))[0])
+                        cont3 = int(struct.unpack('>B', mm.read(1))[0])
                         byte3 = int(huffmanEncoding(byte2, cont3),16)
                         if cont3 < 128:
                             unknown_header.append(byte3)
@@ -566,7 +571,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                             count+=1
                         else:
                             count+=1
-                            cont4 = int(struct.unpack('>B', file.read(1))[0])
+                            cont4 = int(struct.unpack('>B', mm.read(1))[0])
                             byte4 = int(huffmanEncoding(byte3, cont4),16)
                             if cont4 < 128:
                                 unknown_header.append(byte4)
@@ -574,7 +579,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                 count+=1
                             else:
                                 count+=1
-                                cont5 = int(struct.unpack('>B', file.read(1))[0])
+                                cont5 = int(struct.unpack('>B', mm.read(1))[0])
                                 byte5 = int(huffmanEncoding(byte4, cont5),16)
                                 if cont5 < 128:
                                     unknown_header.append(byte5)
@@ -582,7 +587,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                     count+=1
                                 else:
                                     count+=1
-                                    cont6 = int(struct.unpack('>B', file.read(1))[0])
+                                    cont6 = int(struct.unpack('>B', mm.read(1))[0])
                                     byte6 = int(huffmanEncoding(byte5, cont6),16)
                                     if cont6 < 128:
                                         unknown_header.append(byte6)
@@ -590,7 +595,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                         count+=1
                                     else:
                                         count+=1
-                                        cont7 = int(struct.unpack('>B', file.read(1))[0])
+                                        cont7 = int(struct.unpack('>B', mm.read(1))[0])
                                         byte7 = int(huffmanEncoding(byte6, cont7),16)
                                         if cont7 < 128:
                                             unknown_header.append(byte7)
@@ -598,7 +603,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                             count+=1
                                         else:
                                             count+=1
-                                            cont8 = int(struct.unpack('>B', file.read(1))[0])
+                                            cont8 = int(struct.unpack('>B', mm.read(1))[0])
                                             byte8 = int(huffmanEncoding(byte7, cont8),16)
                                             if cont8 < 128:
                                                 unknown_header.append(byte8)
@@ -616,21 +621,21 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
             #Append limit to list to know how many bytes takes the start of the header (because 3 integers are not necessarily only 3 bytes)
             limit.append(count)
             #Read byte by byte, convert in int, and append to unknown_header list
-            byte = int(struct.unpack('>B', file.read(1))[0])
+            byte = int(struct.unpack('>B', mm.read(1))[0])
             if byte < 128:
                 unknown_header.append(serialTypes(byte))
                 unknown_header_2.append(byte)
                 count+=1
             #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
             else:
-                cont1 = int(struct.unpack('>B', file.read(1))[0])
+                cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
                 if cont1 < 128:
                     unknown_header.append(serialTypes(byte1))
                     unknown_header_2.append(byte1)
                     count+=2
                 else:
-                    cont2 = int(struct.unpack('>B', file.read(1))[0])
+                    cont2 = int(struct.unpack('>B', mm.read(1))[0])
                     byte2 = int(huffmanEncoding(byte1, cont2),16)
                     count+=2
                     if cont2 < 128:
@@ -639,7 +644,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                         count+=1
                     else:
                         count+=1
-                        cont3 = int(struct.unpack('>B', file.read(1))[0])
+                        cont3 = int(struct.unpack('>B', mm.read(1))[0])
                         byte3 = int(huffmanEncoding(byte2, cont3),16)
                         if cont3 < 128:
                             unknown_header.append(serialTypes(byte3))
@@ -647,7 +652,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                             count+=1
                         else:
                             count+=1
-                            cont4 = int(struct.unpack('>B', file.read(1))[0])
+                            cont4 = int(struct.unpack('>B', mm.read(1))[0])
                             byte4 = int(huffmanEncoding(byte3, cont4),16)
                             if cont4 < 128:
                                 unknown_header.append(serialTypes(byte4))
@@ -655,7 +660,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                 count+=1
                             else:
                                 count+=1
-                                cont5 = int(struct.unpack('>B', file.read(1))[0])
+                                cont5 = int(struct.unpack('>B', mm.read(1))[0])
                                 byte5 = int(huffmanEncoding(byte4, cont5),16)
                                 if cont5 < 128:
                                     unknown_header.append(serialTypes(byte5))
@@ -663,7 +668,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                     count+=1
                                 else:
                                     count+=1
-                                    cont6 = int(struct.unpack('>B', file.read(1))[0])
+                                    cont6 = int(struct.unpack('>B', mm.read(1))[0])
                                     byte6 = int(huffmanEncoding(byte5, cont6),16)
                                     if cont6 < 128:
                                         unknown_header.append(serialTypes(byte6))
@@ -671,7 +676,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                         count+=1
                                     else:
                                         count+=1
-                                        cont7 = int(struct.unpack('>B', file.read(1))[0])
+                                        cont7 = int(struct.unpack('>B', mm.read(1))[0])
                                         byte7 = int(huffmanEncoding(byte6, cont7),16)
                                         if cont7 < 128:
                                             unknown_header.append(serialTypes(byte7))
@@ -679,7 +684,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
                                             count+=1
                                         else:
                                             count+=1
-                                            cont8 = int(struct.unpack('>B', file.read(1))[0])
+                                            cont8 = int(struct.unpack('>B', mm.read(1))[0])
                                             byte8 = int(huffmanEncoding(byte7, cont8),16)
                                             if cont8 < 128:
                                                 unknown_header.append(serialTypes(byte8))
@@ -701,7 +706,7 @@ def decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_sta
 def decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, scenario, z):
     
     #Go to the end of the match to start reading payload content that comes just after the header/match
-    file.seek(b)
+    mm.seek(b)
     
     #For each field's length of the record
     for l in ((unknown_header)[z:]):
@@ -709,7 +714,7 @@ def decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, re
         #Read bytes for that length and decode it according to encoding : 
         #e.g. possible header = [48, 42, 8, 0, 24, 7, 1, 0, 8, 0] 
         #--> read the following number of bytes from type1 [0, 24, 7, 1, 0, 8, 0]
-        payload_field = file.read(l)
+        payload_field = mm.read(l)
         
         #Append the content to payload list :
         #e.g. [0, 24, 7, 1, 0, 8, 0] --> ['', 'https://www.youtube.com/', 'YouTube', 3, '', 13263172804027223, '']
@@ -1004,7 +1009,7 @@ for configfile in args.config:
         with open(open_file, 'r+b') as file:
             #mmap: file is mapped in memory and its content is internally loaded from disk as needed
             #instead of file.read() or file.readlines(), improves performance speading up the reading of files
-            mm = mmap.mmap(file.fileno(), 0)
+            mm = mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ)
 
 
 
@@ -1035,7 +1040,7 @@ for configfile in args.config:
                         fields_tuple = fields_tuple.replace(']', '')
 
                         #Go to start of the match
-                        file.seek(a)
+                        mm.seek(a)
 
                         #Decode unknown header : bytes --> integers
                         decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, freeblock=False)
@@ -1043,19 +1048,25 @@ for configfile in args.config:
                         #If limit is an empty list, header only contains start of header and is therefore a non-valid header
                         if not limit:
                             pass
+                        
                         #Else: may be a valid header
                         else:
+                            
                             #If the payload length is equal to the sum of each type length plus the length of the serial types array AND the sum of all types is not equal to 0
                             #AND the serial types array length is equal to the number of bytes from the serial types array length 
                             #AND the length of the header is > 3 (payload length, rowid, serial types array length, type1)
                             if (unknown_header[0] == sum(unknown_header[2:])) and (sum(unknown_header[3:]) != 0) and (len(unknown_header) > 3) and ((b-a-limit[0]) == ((unknown_header[2]-1) or (unknown_header[2]-2))):
+                               
                                 #Then it might be a record so decode it
                                 decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, scenario=0, z=3)
+                                
                                 #If record contains the same number of columns as the table it matched with, append its insert statement to statements list
                                 if len(fields_regex[0]) == len(payload):
                                     insert_statement = "".join(["INSERT INTO", " ", table, fields_tuple, " VALUES ", str(tuple(payload))])
                                     statements.append(insert_statement)
-            print('\n', 'Finished processing scenario 0/5')
+           
+            #Print time elapsed after each scenario processing
+            print('\n', 'Finished processing scenario 0/5 - %s seconds' % (time.time() - start_time))
 
 
 
@@ -1076,7 +1087,7 @@ for configfile in args.config:
                         fields_tuple_s1 = fields_tuple_s1.replace('[', '')
                         fields_tuple_s1 = fields_tuple_s1.replace(']', '')
                         
-                        file.seek(a)
+                        mm.seek(a)
 
                         decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, freeblock=True)
 
@@ -1173,7 +1184,8 @@ for configfile in args.config:
                                 if len(fields_regex_s1[0]) == len(payload_s1):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
                                     statements.append(insert_statement)
-            print('Finished processing scenario 1/5')
+            
+            print('\n', 'Finished processing scenario 1/5 - %s seconds' % (time.time() - start_time))
 
 
                                     
@@ -1194,7 +1206,7 @@ for configfile in args.config:
                         fields_tuple_s2 = fields_tuple_s2.replace('[', '')
                         fields_tuple_s2 = fields_tuple_s2.replace(']', '')
                         
-                        file.seek(a)
+                        mm.seek(a)
                         
                         decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, freeblock=True)
                     
@@ -1211,7 +1223,8 @@ for configfile in args.config:
                                 if len(fields_regex_s2[0]) == len(payload_s2):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s2, fields_tuple_s2, " VALUES ", str(tuple(payload_s2))])
                                     statements.append(insert_statement)
-            print('Finished processing scenario 2/5')
+            
+            print('\n', 'Finished processing scenario 2/5 - %s seconds' % (time.time() - start_time))
 
 
 
@@ -1220,7 +1233,7 @@ for configfile in args.config:
             """SCENARIO 3 : overwritten : payload length, rowid --> record starts at serial types array length"""
             for table_regex_s3 in tables_regexes_s3:
                 for table_s3, fields_regex_s3 in table_regex_s3.items():
-                   for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True, concurrent=True):
+                    for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s3, unknown_header_2_s3, limit_s3, payload_s3 = [], [], [], []
                         a = match_s3.start()
@@ -1232,7 +1245,7 @@ for configfile in args.config:
                         fields_tuple_s3 = fields_tuple_s3.replace('[', '')
                         fields_tuple_s3 = fields_tuple_s3.replace(']', '')
                         
-                        file.seek(a)
+                        mm.seek(a)
                         
                         decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
 
@@ -1248,7 +1261,8 @@ for configfile in args.config:
                                 if len(fields_regex_s3[0]) == len(payload_s3):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s3, fields_tuple_s3, " VALUES ", str(tuple(payload_s3))])
                                     statements.append(insert_statement)
-            print('Finished processing scenario 3/5')
+            
+            print('\n', 'Finished processing scenario 3/5 - %s seconds' % (time.time() - start_time))
 
 
 
@@ -1257,7 +1271,7 @@ for configfile in args.config:
             """SCENARIO 4 : overwritten : payload length, rowid, part of serial types array length --> record starts at part of serial types array length"""
             for table_regex_s4 in tables_regexes_s4:
                 for table_s4, fields_regex_s4 in table_regex_s4.items():
-                  for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True, concurrent=True):
+                    for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True, concurrent=True):
                         
                         unknown_header_s4, unknown_header_2_s4, limit_s4, payload_s4 = [], [], [], []
                         a = match_s4.start()
@@ -1269,7 +1283,7 @@ for configfile in args.config:
                         fields_tuple_s4 = fields_tuple_s4.replace('[', '')
                         fields_tuple_s4 = fields_tuple_s4.replace(']', '')
 
-                        file.seek(a)
+                        mm.seek(a)
 
                         decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
 
@@ -1282,12 +1296,14 @@ for configfile in args.config:
                             #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
                             #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, part of serial types array length, type1)
                             if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1)) and (len(unknown_header_s4) > 3)):
+                                
                                 decode_record(b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos_0, record_infos_1, record_infos_2, scenario=4, z=3)
                                 
                                 if len(fields_regex_s4[0]) == len(payload_s4):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s4, fields_tuple_s4, " VALUES ", str(tuple(payload_s4))])
                                     statements.append(insert_statement)
-            print('Finished processing scenario 4/5')
+            
+            print('\n', 'Finished processing scenario 4/5 - %s seconds' % (time.time() - start_time))
 
 
 
@@ -1312,7 +1328,7 @@ for configfile in args.config:
                         fields_tuple_s5 = fields_tuple_s5.replace('[', '')
                         fields_tuple_s5 = fields_tuple_s5.replace(']', '')
 
-                        file.seek(a)
+                        mm.seek(a)
                         
                         decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
 
@@ -1328,8 +1344,8 @@ for configfile in args.config:
                                 if len(fields_regex_s5[0]) == len(payload_s5):
                                     insert_statement = "".join(["INSERT INTO", " ", table_s5, fields_tuple_s5, " VALUES ", str(tuple(payload_s5))])
                                     statements.append(insert_statement)
-            print('Finished processing scenario 5/5')
-
+            
+            print('\n', 'Finished processing scenario 5/5 - %s seconds' % (time.time() - start_time))
 
 
 

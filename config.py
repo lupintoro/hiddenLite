@@ -78,11 +78,11 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
 
     #If the record is overwritten by a freeblock, read 2 bytes (next freeblock offset) then 2 bytes (length of this freeblock)
     if freeblock:
-        byte = int(struct.unpack('>H', file.read(2))[0])
+        byte = int(struct.unpack('>H', mm.read(2))[0])
         unknown_header.append(byte)
         count+=2
         
-        byte = int(struct.unpack('>H', file.read(2))[0])
+        byte = int(struct.unpack('>H', mm.read(2))[0])
         unknown_header.append(byte)
         count+=2
     
@@ -92,19 +92,19 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
         if len(unknown_header) < len_start_header:
 
             #Read byte by byte, convert in int, and append to unknown_header list
-            byte = int(struct.unpack('>B', file.read(1))[0])
+            byte = int(struct.unpack('>B', mm.read(1))[0])
             if byte < 128:
                 unknown_header.append(byte)
                 count+=1
             #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
             else:
-                cont1 = int(struct.unpack('>B', file.read(1))[0])
+                cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
                 if cont1 < 128:
                     unknown_header.append(byte1)
                     count+=2
                 else:
-                    cont2 = int(struct.unpack('>B', file.read(1))[0])
+                    cont2 = int(struct.unpack('>B', mm.read(1))[0])
                     byte2 = int(huffmanEncoding(byte1, cont2),16)
                     count+=2
                     if cont2 < 128:
@@ -112,42 +112,42 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
                         count+=1
                     else:
                         count+=1
-                        cont3 = int(struct.unpack('>B', file.read(1))[0])
+                        cont3 = int(struct.unpack('>B', mm.read(1))[0])
                         byte3 = int(huffmanEncoding(byte2, cont3),16)
                         if cont3 < 128:
                             unknown_header.append(byte3)
                             count+=1
                         else:
                             count+=1
-                            cont4 = int(struct.unpack('>B', file.read(1))[0])
+                            cont4 = int(struct.unpack('>B', mm.read(1))[0])
                             byte4 = int(huffmanEncoding(byte3, cont4),16)
                             if cont4 < 128:
                                 unknown_header.append(byte4)
                                 count+=1
                             else:
                                 count+=1
-                                cont5 = int(struct.unpack('>B', file.read(1))[0])
+                                cont5 = int(struct.unpack('>B', mm.read(1))[0])
                                 byte5 = int(huffmanEncoding(byte4, cont5),16)
                                 if cont5 < 128:
                                     unknown_header.append(byte5)
                                     count+=1
                                 else:
                                     count+=1
-                                    cont6 = int(struct.unpack('>B', file.read(1))[0])
+                                    cont6 = int(struct.unpack('>B', mm.read(1))[0])
                                     byte6 = int(huffmanEncoding(byte5, cont6),16)
                                     if cont6 < 128:
                                         unknown_header.append(byte6)
                                         count+=1
                                     else:
                                         count+=1
-                                        cont7 = int(struct.unpack('>B', file.read(1))[0])
+                                        cont7 = int(struct.unpack('>B', mm.read(1))[0])
                                         byte7 = int(huffmanEncoding(byte6, cont7),16)
                                         if cont7 < 128:
                                             unknown_header.append(byte7)
                                             count+=1
                                         else:
                                             count+=1
-                                            cont8 = int(struct.unpack('>B', file.read(1))[0])
+                                            cont8 = int(struct.unpack('>B', mm.read(1))[0])
                                             byte8 = int(huffmanEncoding(byte7, cont8),16)
                                             if cont8 < 128:
                                                 unknown_header.append(byte8)
@@ -163,19 +163,19 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
             #Append limit to list to know how many bytes takes the start of the header (because 3 integers are not necessarily only 3 bytes)
             limit.append(count)
             #Read byte by byte, convert in int, and append to unknown_header list
-            byte = int(struct.unpack('>B', file.read(1))[0])
+            byte = int(struct.unpack('>B', mm.read(1))[0])
             if byte < 128:
                 unknown_header.append(serialTypes(byte))
                 count+=1
             #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
             else:
-                cont1 = int(struct.unpack('>B', file.read(1))[0])
+                cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
                 if cont1 < 128:
                     unknown_header.append(serialTypes(byte1))
                     count+=2
                 else:
-                    cont2 = int(struct.unpack('>B', file.read(1))[0])
+                    cont2 = int(struct.unpack('>B', mm.read(1))[0])
                     byte2 = int(huffmanEncoding(byte1, cont2),16)
                     count+=2
                     if cont2 < 128:
@@ -183,42 +183,42 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
                         count+=1
                     else:
                         count+=1
-                        cont3 = int(struct.unpack('>B', file.read(1))[0])
+                        cont3 = int(struct.unpack('>B', mm.read(1))[0])
                         byte3 = int(huffmanEncoding(byte2, cont3),16)
                         if cont3 < 128:
                             unknown_header.append(serialTypes(byte3))
                             count+=1
                         else:
                             count+=1
-                            cont4 = int(struct.unpack('>B', file.read(1))[0])
+                            cont4 = int(struct.unpack('>B', mm.read(1))[0])
                             byte4 = int(huffmanEncoding(byte3, cont4),16)
                             if cont4 < 128:
                                 unknown_header.append(serialTypes(byte4))
                                 count+=1
                             else:
                                 count+=1
-                                cont5 = int(struct.unpack('>B', file.read(1))[0])
+                                cont5 = int(struct.unpack('>B', mm.read(1))[0])
                                 byte5 = int(huffmanEncoding(byte4, cont5),16)
                                 if cont5 < 128:
                                     unknown_header.append(serialTypes(byte5))
                                     count+=1
                                 else:
                                     count+=1
-                                    cont6 = int(struct.unpack('>B', file.read(1))[0])
+                                    cont6 = int(struct.unpack('>B', mm.read(1))[0])
                                     byte6 = int(huffmanEncoding(byte5, cont6),16)
                                     if cont6 < 128:
                                         unknown_header.append(serialTypes(byte6))
                                         count+=1
                                     else:
                                         count+=1
-                                        cont7 = int(struct.unpack('>B', file.read(1))[0])
+                                        cont7 = int(struct.unpack('>B', mm.read(1))[0])
                                         byte7 = int(huffmanEncoding(byte6, cont7),16)
                                         if cont7 < 128:
                                             unknown_header.append(serialTypes(byte7))
                                             count+=1
                                         else:
                                             count+=1
-                                            cont8 = int(struct.unpack('>B', file.read(1))[0])
+                                            cont8 = int(struct.unpack('>B', mm.read(1))[0])
                                             byte8 = int(huffmanEncoding(byte7, cont8),16)
                                             if cont8 < 128:
                                                 unknown_header.append(serialTypes(byte8))
@@ -341,6 +341,10 @@ for db_file in pbar:
 
     #Open database to retrieve general information and schema
     with open(open_file, 'r+b') as file:
+        
+        #Memory map database file and read from it
+        mm = mmap.mmap(file.fileno(), length=0, access=mmap.ACCESS_READ)
+        
         #Database size
         size = os.path.getsize(open_file)
         #Database name without extension
@@ -349,10 +353,10 @@ for db_file in pbar:
         file_name = file_name.replace(extension, '')
         
         #Go to offset 0 of database
-        file.seek(0)
+        mm.seek(0)
 
         #Read 16 bytes for the SQLite format 3 signature
-        signature = file.read(15)
+        signature = mm.read(15)
         
         #If it's not an SQLite database
         if signature != b'\x53\x51\x4C\x69\x74\x65\x20\x66\x6F\x72\x6D\x61\x74\x20\x33':
@@ -360,7 +364,7 @@ for db_file in pbar:
         
         #If it's an SQLite database
         else:
-            file.read(1)
+            mm.read(1)
             
             #Create a dictionary to store general information
             db_infos = {}
@@ -371,51 +375,51 @@ for db_file in pbar:
             #Then retrieve important header information
 
             #Page size
-            page_size = int(struct.unpack('>H', file.read(2))[0])
+            page_size = int(struct.unpack('>H', mm.read(2))[0])
             db_infos["page size"] = page_size
 
             #Write version
-            file_format_w = int(struct.unpack('>B', file.read(1))[0])
+            file_format_w = int(struct.unpack('>B', mm.read(1))[0])
             db_infos["write version"] = file_format_w
 
             #Read version
-            file_format_r = int(struct.unpack('>B', file.read(1))[0])
+            file_format_r = int(struct.unpack('>B', mm.read(1))[0])
             db_infos["read version"] = file_format_r
             
             #Reserved bytes
-            reserved_bytes = int(struct.unpack('>B', file.read(1))[0])
+            reserved_bytes = int(struct.unpack('>B', mm.read(1))[0])
             db_infos["reserved bytes"] = reserved_bytes
 
-            file.read(3)
+            mm.read(3)
             
             #Database updates
-            file_change_counter = int(struct.unpack('>i', file.read(4))[0])
+            file_change_counter = int(struct.unpack('>i', mm.read(4))[0])
             db_infos["database updates"] = file_change_counter
 
             #Number of pages
-            number_pages = int(struct.unpack('>i', file.read(4))[0])
+            number_pages = int(struct.unpack('>i', mm.read(4))[0])
             db_infos["number of pages"] = number_pages
 
             #Database size
             db_size = int(page_size) * int(number_pages)
             db_infos["database size"] = db_size
 
-            file.read(8)
+            mm.read(8)
 
             #Schema changes
-            schema_cookie = int(struct.unpack('>i', file.read(4))[0]) 
+            schema_cookie = int(struct.unpack('>i', mm.read(4))[0]) 
             db_infos["schema changes"] = schema_cookie
 
-            file.read(12)
+            mm.read(12)
 
             #Text encoding
-            text_encoding = int(struct.unpack('>i', file.read(4))[0])
+            text_encoding = int(struct.unpack('>i', mm.read(4))[0])
             db_infos["text encoding"] = text_encoding
 
-            file.read(36)
+            mm.read(36)
 
             #SQLite version
-            sqlite_version = int(struct.unpack('>i', file.read(4))[0])
+            sqlite_version = int(struct.unpack('>i', mm.read(4))[0])
             db_infos["sqlite version"] = sqlite_version
 
             #Config.json file is an array of dicts
@@ -434,9 +438,6 @@ for db_file in pbar:
             regex_s4 = re.compile(regex_s4)
             regex_s5 = re.compile(regex_s5)
             
-
-            #Memory map database file and read from it
-            mm = mmap.mmap(file.fileno(), 0)
             
             #List of CREATE TABLE statements
             payloads = []
@@ -452,7 +453,7 @@ for db_file in pbar:
                 b = match.end()
 
                 #Go to start of the match
-                file.seek(a)
+                mm.seek(a)
 
                 #Decode unknown header : bytes --> integers
                 decode_unknown_header(unknown_header, a, b, limit, len_start_header=3, freeblock=False)
@@ -462,12 +463,12 @@ for db_file in pbar:
                 if ((unknown_header[0] == sum(unknown_header[2:])) and (b-a-limit[0]+1 == unknown_header[2])):
                     
                      #Go to the end of the match to start reading payload content that comes just after the header/match
-                    file.seek(b)
+                    mm.seek(b)
 
                     #For each field's length of the record
                     for l in ((unknown_header)[3:]):
                         #Read bytes for that length and decode it according to encoding
-                        payload_field = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field = mm.read(l).decode('utf-8', errors='ignore')
                         #Append the content to payload list
                         payload.append(payload_field)
                     #Append the payload to payloads list
@@ -484,7 +485,7 @@ for db_file in pbar:
                 a = match_s1.start()
                 b = match_s1.end()
 
-                file.seek(a)
+                mm.seek(a)
 
                 decode_unknown_header(unknown_header_s1, a, b, limit_s1, len_start_header=2, freeblock=True)
     
@@ -493,10 +494,10 @@ for db_file in pbar:
                     #As we lost type1, and we know it's always 'table', we can add the integer '5' as type1 in unknown_header
                     unknown_header_s1.insert(2, 5)
                     
-                    file.seek(b)
+                    mm.seek(b)
 
                     for l in ((unknown_header_s1)[2:]):
-                        payload_field_s1 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field_s1 = mm.read(l).decode('utf-8', errors='ignore')
                         payload_s1.append(payload_field_s1)
                     
                     for element in payloads:
@@ -518,17 +519,17 @@ for db_file in pbar:
                 a = match_s2.start()
                 b = match_s2.end()
 
-                file.seek(a)
+                mm.seek(a)
 
                 decode_unknown_header(unknown_header_s2, a, b, limit_s2, len_start_header=2, freeblock=True)
     
                 #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
                 if (unknown_header_s2[1] == ((sum(unknown_header_s2[2:]))+(b-a))):
 
-                    file.seek(b)
+                    mm.seek(b)
                     
                     for l in ((unknown_header_s2)[2:]):
-                        payload_field_s2 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field_s2 = mm.read(l).decode('utf-8', errors='ignore')
                         payload_s2.append(payload_field_s2)
                     for element in payloads:
                         if element[1] != payload_s2[1]:
@@ -545,17 +546,17 @@ for db_file in pbar:
                 a = match_s3.start()
                 b = match_s3.end()
 
-                file.seek(a)
+                mm.seek(a)
 
                 decode_unknown_header(unknown_header_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
     
                 #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
                 if ((sum(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])):
                    
-                    file.seek(b)
+                    mm.seek(b)
                     
                     for l in ((unknown_header_s3)[4:]):
-                        payload_field_s3 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field_s3 = mm.read(l).decode('utf-8', errors='ignore')
                         payload_s3.append(payload_field_s3)
                     for element in payloads:
                         if element[1] != payload_s3[1]:
@@ -572,7 +573,7 @@ for db_file in pbar:
                 a = match_s4.start()
                 b = match_s4.end()
 
-                file.seek(a)
+                mm.seek(a)
 
                 decode_unknown_header(unknown_header_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
     
@@ -580,10 +581,10 @@ for db_file in pbar:
                 #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
                 if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1))):
                    
-                    file.seek(b)
+                    mm.seek(b)
                     
                     for l in ((unknown_header_s4)[3:]):
-                        payload_field_s4 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field_s4 = mm.read(l).decode('utf-8', errors='ignore')
                         payload_s4.append(payload_field_s4)
                     for element in payloads:
                         if element[1] != payload_s4[1]:
@@ -600,17 +601,17 @@ for db_file in pbar:
                 a = match_s5.start()
                 b = match_s5.end()
 
-                file.seek(a)
+                mm.seek(a)
 
                 decode_unknown_header(unknown_header_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
     
                 #If the freeblock length is equal to the sum of each type length plus the length until serial types
                 if (unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))):
                    
-                    file.seek(b)
+                    mm.seek(b)
                     
                     for l in ((unknown_header_s5)[4:]):
-                        payload_field_s5 = file.read(l).decode('utf-8', errors='ignore')
+                        payload_field_s5 = mm.read(l).decode('utf-8', errors='ignore')
                         payload_s5.append(payload_field_s5)
                     for element in payloads:
                         if element[1] != payload_s5[1]:
@@ -864,10 +865,13 @@ for db_file in pbar:
             with open (args.output + output_config, 'w') as config_file:
                 json.dump(config, config_file, indent=2)
             
+            
         
             #Close json file
             config_file.close()
-
+        
+        #Free the memory
+        mm.close
     
     #Close database file
     file.close()
