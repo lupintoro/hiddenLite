@@ -291,7 +291,7 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
                 
                 #Regex for the freeblock length, with different min size according to table
                 #The maximum is 0xff, same for first byte, since freeblock is on 2-bytes --> min 00min, max ffff
-                freeblock_length = rf'(([\x00-\xff]{{2}})|([\x00]{{1}}[\x{fb_min}-\xff]{{1}}))'
+                freeblock_length = rf'(([\x00-\xff]{{1}}[\x{fb_min}-\xff]{{1}})|([\x00]{{1}}[\x{fb_min}-\xff]{{1}})|([\x01-\xff]{{1}}[\x00-\xff]{{1}}))'
                 #Add the regex to a list of freeblock lengths regexes
                 freeblock_min_max.append(freeblock_length)
                 #Set min back to 4 (the minimum is 4 bytes because the freeblock itself is 4 bytes and the freeblock length counts itself)
@@ -384,15 +384,19 @@ def build_regex(header_pattern, headers_patterns, payloads_patterns, list_fields
             counter_max = 1
 
 
-        #If type1 of the array is overwritten (scenario 1), remove first type from header pattern and surround header group by ()
+        #If type1 of the array is overwritten (scenario 1), remove first type from header pattern and surround header group by () and by the condition that the header is not only composed by 0s
         if scenario == 1:
-            header_pattern[0] = '('
-            header_pattern.insert(len(header_pattern), ')')
-        
-        #Else, surround header group by ()
-        else:
+            header_pattern[0] = r'((?![\x00]+$))'
             header_pattern.insert(0, '(')
-            header_pattern.insert(len(header_pattern), ')')
+            header_pattern.insert(2, '(')
+            header_pattern.insert(len(header_pattern), '))')
+        
+        #Else, surround header group by () and by the condition that the header is not only composed by 0s
+        else:
+            header_pattern.insert(0, r'((?![\x00]+$))')
+            header_pattern.insert(0, '(')
+            header_pattern.insert(2, '(')
+            header_pattern.insert(len(header_pattern), '))')
 
     
 
@@ -1039,12 +1043,13 @@ for configfile in args.config:
                         fields_tuple = fields_tuple.replace('[', '')
                         fields_tuple = fields_tuple.replace(']', '')
 
+
                         #Go to start of the match
                         mm.seek(a)
 
                         #Decode unknown header : bytes --> integers
                         decode_unknown_header(unknown_header, unknown_header_2, a, b, limit, len_start_header=3, freeblock=False)
-
+            
                         #If limit is an empty list, header only contains start of header and is therefore a non-valid header
                         if not limit:
                             pass
@@ -1056,10 +1061,10 @@ for configfile in args.config:
                             #AND the serial types array length is equal to the number of bytes from the serial types array length 
                             #AND the length of the header is > 3 (payload length, rowid, serial types array length, type1)
                             if (unknown_header[0] == sum(unknown_header[2:])) and (sum(unknown_header[3:]) != 0) and (len(unknown_header) > 3) and ((b-a-limit[0]) == ((unknown_header[2]-1) or (unknown_header[2]-2))):
-                               
+
                                 #Then it might be a record so decode it
                                 decode_record(b, payload, unknown_header, unknown_header_2, fields_regex, record_infos_0, record_infos_1, record_infos_2, scenario=0, z=3)
-                                
+            
                                 #If record contains the same number of columns as the table it matched with, append its insert statement to statements list
                                 if len(fields_regex[0]) == len(payload):
                                     insert_statement = "".join(["INSERT INTO", " ", table, fields_tuple, " VALUES ", str(tuple(payload))])
@@ -1075,116 +1080,118 @@ for configfile in args.config:
             """SCENARIO 1 : overwritten : payload length, rowid, serial types array length, type 1 --> record starts at type 2"""
             for table_regex_s1 in tables_regexes_s1:
                 for table_s1, fields_regex_s1 in table_regex_s1.items():
-                    for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True, concurrent=True):
-                        
-                        unknown_header_s1, unknown_header_2_s1, limit_s1, payload_s1 = [], [], [], []
-                        a = match_s1.start()
-                        b = match_s1.end()
-                        record_infos_0 = 'Scenario 1 : deleted records overwritten until type 2'
-                        record_infos_1 = str(a)
-                        record_infos_2 = str(mainfile)
-                        fields_tuple_s1 = str(tuple(fields_regex_s1[0]))
-                        fields_tuple_s1 = fields_tuple_s1.replace('[', '')
-                        fields_tuple_s1 = fields_tuple_s1.replace(']', '')
-                        
-                        mm.seek(a)
-
-                        decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, freeblock=True)
-
-                        if not limit_s1:
-                            pass
-                        
-                        else:
+                    #If table contains more than one column
+                    if len(fields_regex_s1[0]) > 4:
+                        for match_s1 in re.finditer(fields_regex_s1[2], mm, overlapped=True, concurrent=True):
                             
-                            #Then we have to assume what type1 is since it's overwritten (the regex is [next freeblock, actual freeblock length, type2])
-                            #WARNING: more false positives because more options
-                            #WARNING: more duplicates if 2 or more tables with same number of columns --> will try for each possible type1
-                            #WARNING: if table has only 1 column, the whole header is overwritten and the record won't necessarily be recovered
+                            unknown_header_s1, unknown_header_2_s1, limit_s1, payload_s1 = [], [], [], []
+                            a = match_s1.start()
+                            b = match_s1.end()
+                            record_infos_0 = 'Scenario 1 : deleted records overwritten until type 2'
+                            record_infos_1 = str(a)
+                            record_infos_2 = str(mainfile)
+                            fields_tuple_s1 = str(tuple(fields_regex_s1[0]))
+                            fields_tuple_s1 = fields_tuple_s1.replace('[', '')
+                            fields_tuple_s1 = fields_tuple_s1.replace(']', '')
+
+                            mm.seek(a)
+
+                            decode_unknown_header(unknown_header_s1, unknown_header_2_s1, a, b, limit_s1, len_start_header=2, freeblock=True)
                             
-                            #If type1 is an integer or a floating, then a number from 0-9 is missing on first position on the header
-                            if (fields_regex_s1[1])[0] == 'integer' or 'integer_not_null' or 'real' or 'real_not_null':
-                                if (((sum(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1] <= (sum(unknown_header_s1[2:]) + (b-a) + 9))):
-                                    #x is the unknown integer
-                                    x = unknown_header_s1[1] - sum(unknown_header_s1[2:]) - (b-a)
-                                    #Insert it on third place of the header because type1 follows the freeblock in this scenario
-                                    unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                    if len(fields_regex_s1[0]) == len(payload_s1):
-                                        insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                        statements.append(insert_statement)
-
-
-                            #If type1 is an integer primary key, then a 0 is missing on first position on the header
-                            elif (fields_regex_s1[1])[0] == 'zero':
-                                if ((sum(unknown_header_s1[2:]) + (b-a+1)) == unknown_header_s1[1]):
-
-                                    x = 0
-                                    unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                    if len(fields_regex_s1[0]) == len(payload_s1):
-                                        insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                        statements.append(insert_statement)
-
+                            if not limit_s1:
+                                pass
                             
-                            #If type1 is boolean, then a 8=0 or a 9=1 is missing on first position on the header
-                            #Since the 8 or 9 information is enough, we don't find it further on the record payload, so it doesn't change its length (x=0)
-                            #So, if it was overwritten as type1, we cannot know if it was a 8 or a 9 (True or False) --> not recovered
-                            elif (fields_regex_s1[1])[0] == 'boolean' or 'boolean_not_null':
-                                if ((sum(unknown_header_s1[2:]) + (b-a+1)) == unknown_header_s1[1]):
+                            else:
+                                
+                                #Then we have to assume what type1 is since it's overwritten (the regex is [next freeblock, actual freeblock length, type2])
+                                #WARNING: more false positives because more options
+                                #WARNING: more duplicates if 2 or more tables with same number of columns --> will try for each possible type1
+                                #WARNING: if table has only 1 column, the whole header is overwritten and the record won't necessarily be recovered
+                                
+                                #If type1 is an integer or a floating, then a number from 0-9 is missing on first position on the header
+                                if (fields_regex_s1[1])[0] == 'integer' or 'integer_not_null' or 'real' or 'real_not_null':
+                                    if (((sum(unknown_header_s1[2:]) + (b-a)) <= unknown_header_s1[1] <= (sum(unknown_header_s1[2:]) + (b-a) + 9))):
+                                        #x is the unknown integer
+                                        x = unknown_header_s1[1] - sum(unknown_header_s1[2:]) - (b-a)
+                                        #Insert it on third place of the header because type1 follows the freeblock in this scenario
+                                        unknown_header_s1.insert(2, x)
 
-                                    x = 0
+                                        decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
+                                        if len(fields_regex_s1[0]) == len(payload_s1):
+                                            insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
+                                            statements.append(insert_statement)
+
+
+                                #If type1 is an integer primary key, then a 0 is missing on first position on the header
+                                elif (fields_regex_s1[1])[0] == 'zero':
+                                    if ((sum(unknown_header_s1[2:]) + (b-a+1)) == unknown_header_s1[1]):
+
+                                        x = 0
+                                        unknown_header_s1.insert(2, x)
+
+                                        decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
+                                        if len(fields_regex_s1[0]) == len(payload_s1):
+                                            insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
+                                            statements.append(insert_statement)
+
+                                
+                                #If type1 is boolean, then a 8=0 or a 9=1 is missing on first position on the header
+                                #Since the 8 or 9 information is enough, we don't find it further on the record payload, so it doesn't change its length (x=0)
+                                #So, if it was overwritten as type1, we cannot know if it was a 8 or a 9 (True or False) --> not recovered
+                                elif (fields_regex_s1[1])[0] == 'boolean' or 'boolean_not_null':
+                                    if ((sum(unknown_header_s1[2:]) + (b-a+1)) == unknown_header_s1[1]):
+
+                                        x = 0
+                                        unknown_header_s1.insert(2, x)
+
+                                        decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
+                                        payload_s1[3] == 'boolean value not recovered'
+
+                                        if len(fields_regex_s1[0]) == len(payload_s1):
+                                            insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
+                                            statements.append(insert_statement)
+                    
+
+                                #If type1 is a blob, then an even number is missing on first position on the header
+                                elif (fields_regex_s1[1])[0] == 'blob' or 'blob_not_null':
+                                    if (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1)))) % 2 == 0:
+                                        x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
+                                        unknown_header_s1.insert(2, x)
+
+                                        decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
+                                        if len(fields_regex_s1[0]) == len(payload_s1):
+                                            insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
+                                            statements.append(insert_statement)
+
+
+                                #If type1 is a text, then an odd number is missing on first position on the header
+                                elif (fields_regex_s1[1])[0] == 'text' or 'text_not_null':
+                                    if (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1)))) % 2 != 0:
+                                        x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
+                                        unknown_header_s1.insert(2, x)
+
+                                        decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
+                                        if len(fields_regex_s1[0]) == len(payload_s1):
+                                            insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
+                                            statements.append(insert_statement)
+                                
+
+                                #Else, if type1 is a numeric, a numeric not null, a numeric date or a numeric date not null, then the value can be anything
+                                else:
+                                    x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
                                     unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
                                     
-                                    payload_s1[3] == 'boolean value not recovered'
-
+                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
+                                        
                                     if len(fields_regex_s1[0]) == len(payload_s1):
                                         insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
                                         statements.append(insert_statement)
                 
-
-                            #If type1 is a blob, then an even number is missing on first position on the header
-                            elif (fields_regex_s1[1])[0] == 'blob' or 'blob_not_null':
-                                if (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1)))) % 2 == 0:
-                                    x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
-                                    unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                    if len(fields_regex_s1[0]) == len(payload_s1):
-                                        insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                        statements.append(insert_statement)
-
-
-                            #If type1 is a text, then an odd number is missing on first position on the header
-                            elif (fields_regex_s1[1])[0] == 'text' or 'text_not_null':
-                                if (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1)))) % 2 != 0:
-                                    x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
-                                    unknown_header_s1.insert(2, x)
-
-                                    decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                    if len(fields_regex_s1[0]) == len(payload_s1):
-                                        insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                        statements.append(insert_statement)
-                            
-
-                            #Else, if type1 is a numeric, a numeric not null, a numeric date or a numeric date not null, then the value can be anything
-                            else:
-                                x = (unknown_header_s1[1] - ((sum(unknown_header_s1[2:]) + (b-a+1))))
-                                unknown_header_s1.insert(2, x)
-                                
-                                decode_record(b, payload_s1, unknown_header_s1, unknown_header_2_s1, fields_regex_s1, record_infos_0, record_infos_1, record_infos_2, scenario=1, z=2)
-                                    
-                                if len(fields_regex_s1[0]) == len(payload_s1):
-                                    insert_statement = "".join(["INSERT INTO", " ", table_s1, fields_tuple_s1, " VALUES ", str(tuple(payload_s1))])
-                                    statements.append(insert_statement)
-            
             print('\n', 'Finished processing scenario 1/5 - %s seconds' % (time.time() - start_time))
 
 
@@ -1194,35 +1201,36 @@ for configfile in args.config:
             """SCENARIO 2 : overwritten : payload length, rowid, serial types array length --> record starts at type 1"""
             for table_regex_s2 in tables_regexes_s2:
                 for table_s2, fields_regex_s2 in table_regex_s2.items():
-                    for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True, concurrent=True):
-                        
-                        unknown_header_s2, unknown_header_2_s2, limit_s2, payload_s2 = [], [], [], []
-                        a = match_s2.start()
-                        b = match_s2.end()
-                        record_infos_0 = 'Scenario 2 : deleted records overwritten until type 1'
-                        record_infos_1 = str(a)
-                        record_infos_2 = str(mainfile)
-                        fields_tuple_s2 = str(tuple(fields_regex_s2[0]))
-                        fields_tuple_s2 = fields_tuple_s2.replace('[', '')
-                        fields_tuple_s2 = fields_tuple_s2.replace(']', '')
-                        
-                        mm.seek(a)
-                        
-                        decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, freeblock=True)
-                    
-                        if not limit_s2:
-                            pass
-                        else:
-                            #WARNING: false positives with 1 and 2-columns headers that can easily match
-                            #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
-                            #AND the sum of all types is not equal to
-                            if (((sum(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((sum(unknown_header_s2[2:]) != 0))):
-
-                                decode_record(b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos_0, record_infos_1, record_infos_2, scenario=2, z=2)
+                    if len(fields_regex_s2[0]) > 4:
+                        for match_s2 in re.finditer(fields_regex_s2[2], mm, overlapped=True, concurrent=True):
+                            
+                            unknown_header_s2, unknown_header_2_s2, limit_s2, payload_s2 = [], [], [], []
+                            a = match_s2.start()
+                            b = match_s2.end()
+                            record_infos_0 = 'Scenario 2 : deleted records overwritten until type 1'
+                            record_infos_1 = str(a)
+                            record_infos_2 = str(mainfile)
+                            fields_tuple_s2 = str(tuple(fields_regex_s2[0]))
+                            fields_tuple_s2 = fields_tuple_s2.replace('[', '')
+                            fields_tuple_s2 = fields_tuple_s2.replace(']', '')
+                            
+                            mm.seek(a)
                                 
-                                if len(fields_regex_s2[0]) == len(payload_s2):
-                                    insert_statement = "".join(["INSERT INTO", " ", table_s2, fields_tuple_s2, " VALUES ", str(tuple(payload_s2))])
-                                    statements.append(insert_statement)
+                            decode_unknown_header(unknown_header_s2, unknown_header_2_s2, a, b, limit_s2, len_start_header=2, freeblock=True)
+                        
+                            if not limit_s2:
+                                pass
+                            else:
+                                #WARNING: false positives with 1 and 2-columns headers that can easily match
+                                #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
+                                #AND the sum of all types is not equal to
+                                if (((sum(unknown_header_s2[2:]) + (b-a)) == (unknown_header_s2[1])) and ((sum(unknown_header_s2[2:]) != 0))):
+
+                                    decode_record(b, payload_s2, unknown_header_s2, unknown_header_2_s2, fields_regex_s2, record_infos_0, record_infos_1, record_infos_2, scenario=2, z=2)
+                                    
+                                    if len(fields_regex_s2[0]) == len(payload_s2):
+                                        insert_statement = "".join(["INSERT INTO", " ", table_s2, fields_tuple_s2, " VALUES ", str(tuple(payload_s2))])
+                                        statements.append(insert_statement)
             
             print('\n', 'Finished processing scenario 2/5 - %s seconds' % (time.time() - start_time))
 
@@ -1233,34 +1241,35 @@ for configfile in args.config:
             """SCENARIO 3 : overwritten : payload length, rowid --> record starts at serial types array length"""
             for table_regex_s3 in tables_regexes_s3:
                 for table_s3, fields_regex_s3 in table_regex_s3.items():
-                    for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True, concurrent=True):
-                        
-                        unknown_header_s3, unknown_header_2_s3, limit_s3, payload_s3 = [], [], [], []
-                        a = match_s3.start()
-                        b = match_s3.end()
-                        record_infos_0 = 'Scenario 3 : deleted records overwritten until serial types array length'
-                        record_infos_1 = str(a)
-                        record_infos_2 = str(mainfile)
-                        fields_tuple_s3 = str(tuple(fields_regex_s3[0]))
-                        fields_tuple_s3 = fields_tuple_s3.replace('[', '')
-                        fields_tuple_s3 = fields_tuple_s3.replace(']', '')
-                        
-                        mm.seek(a)
-                        
-                        decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
+                    if len(fields_regex_s3[0]) > 4:
+                        for match_s3 in re.finditer(fields_regex_s3[2], mm, overlapped=True, concurrent=True):
+                            
+                            unknown_header_s3, unknown_header_2_s3, limit_s3, payload_s3 = [], [], [], []
+                            a = match_s3.start()
+                            b = match_s3.end()
+                            record_infos_0 = 'Scenario 3 : deleted records overwritten until serial types array length'
+                            record_infos_1 = str(a)
+                            record_infos_2 = str(mainfile)
+                            fields_tuple_s3 = str(tuple(fields_regex_s3[0]))
+                            fields_tuple_s3 = fields_tuple_s3.replace('[', '')
+                            fields_tuple_s3 = fields_tuple_s3.replace(']', '')
 
-                        if not limit_s3:
-                            pass
-                        else:
-                            #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
-                            #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, serial types array length, type1)
-                            if (((sum(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((sum(unknown_header_s3[2:]) != 0)) and (len(unknown_header_s3) > 3)):
-                                
-                                decode_record(b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos_0, record_infos_1, record_infos_2, scenario=3, z=3)
-                                
-                                if len(fields_regex_s3[0]) == len(payload_s3):
-                                    insert_statement = "".join(["INSERT INTO", " ", table_s3, fields_tuple_s3, " VALUES ", str(tuple(payload_s3))])
-                                    statements.append(insert_statement)
+                            mm.seek(a)
+                            
+                            decode_unknown_header(unknown_header_s3, unknown_header_2_s3, a, b, limit_s3, len_start_header=3, freeblock=True)
+
+                            if not limit_s3:
+                                pass
+                            else:
+                                #If the freeblock length is equal to the sum of each type length plus the length of the serial types array
+                                #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, serial types array length, type1)
+                                if (((sum(unknown_header_s3[2:]) + 4) == (unknown_header_s3[1])) and ((sum(unknown_header_s3[2:]) != 0)) and (len(unknown_header_s3) > 3)):
+                                    
+                                    decode_record(b, payload_s3, unknown_header_s3, unknown_header_2_s3, fields_regex_s3, record_infos_0, record_infos_1, record_infos_2, scenario=3, z=3)
+                                    
+                                    if len(fields_regex_s3[0]) == len(payload_s3):
+                                        insert_statement = "".join(["INSERT INTO", " ", table_s3, fields_tuple_s3, " VALUES ", str(tuple(payload_s3))])
+                                        statements.append(insert_statement)
             
             print('\n', 'Finished processing scenario 3/5 - %s seconds' % (time.time() - start_time))
 
@@ -1271,37 +1280,38 @@ for configfile in args.config:
             """SCENARIO 4 : overwritten : payload length, rowid, part of serial types array length --> record starts at part of serial types array length"""
             for table_regex_s4 in tables_regexes_s4:
                 for table_s4, fields_regex_s4 in table_regex_s4.items():
-                    for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True, concurrent=True):
-                        
-                        unknown_header_s4, unknown_header_2_s4, limit_s4, payload_s4 = [], [], [], []
-                        a = match_s4.start()
-                        b = match_s4.end()
-                        record_infos_0 = 'Scenario 4 : deleted records overwritten until part of serial types array length'
-                        record_infos_1 = str(a)
-                        record_infos_2 = str(mainfile)
-                        fields_tuple_s4 = str(tuple(fields_regex_s4[0]))
-                        fields_tuple_s4 = fields_tuple_s4.replace('[', '')
-                        fields_tuple_s4 = fields_tuple_s4.replace(']', '')
+                    if len(fields_regex_s4[0]) > 4:
+                        for match_s4 in re.finditer(fields_regex_s4[2], mm, overlapped=True, concurrent=True):
+                            
+                            unknown_header_s4, unknown_header_2_s4, limit_s4, payload_s4 = [], [], [], []
+                            a = match_s4.start()
+                            b = match_s4.end()
+                            record_infos_0 = 'Scenario 4 : deleted records overwritten until part of serial types array length'
+                            record_infos_1 = str(a)
+                            record_infos_2 = str(mainfile)
+                            fields_tuple_s4 = str(tuple(fields_regex_s4[0]))
+                            fields_tuple_s4 = fields_tuple_s4.replace('[', '')
+                            fields_tuple_s4 = fields_tuple_s4.replace(']', '')
+   
+                            mm.seek(a)
 
-                        mm.seek(a)
+                            decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
 
-                        decode_unknown_header(unknown_header_s4, unknown_header_2_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
-
-                        if not limit_s4:
-                            pass
-                        else:
-                            #We assume serial types array length cannot be > 2 bytes, otherwise too much columns, so here 1 byte is overwritten, 1 not
-                            #If the second part of the serial types array length is < than 128 (if it's > 128, it's not a second part of the serial types array length)
-                            #AND if the freeblock length is NOT equal to the sum of each type length plus the length of PART of the serial types array
-                            #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
-                            #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, part of serial types array length, type1)
-                            if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1)) and (len(unknown_header_s4) > 3)):
-                                
-                                decode_record(b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos_0, record_infos_1, record_infos_2, scenario=4, z=3)
-                                
-                                if len(fields_regex_s4[0]) == len(payload_s4):
-                                    insert_statement = "".join(["INSERT INTO", " ", table_s4, fields_tuple_s4, " VALUES ", str(tuple(payload_s4))])
-                                    statements.append(insert_statement)
+                            if not limit_s4:
+                                pass
+                            else:
+                                #We assume serial types array length cannot be > 2 bytes, otherwise too much columns, so here 1 byte is overwritten, 1 not
+                                #If the second part of the serial types array length is < than 128 (if it's > 128, it's not a second part of the serial types array length)
+                                #AND if the freeblock length is NOT equal to the sum of each type length plus the length of PART of the serial types array
+                                #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
+                                #AND the sum of all types is not equal to 0 AND the length of the header is > 3 (next fb, actual fb, part of serial types array length, type1)
+                                if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1)) and (len(unknown_header_s4) > 3)):
+                                    
+                                    decode_record(b, payload_s4, unknown_header_s4, unknown_header_2_s4, fields_regex_s4, record_infos_0, record_infos_1, record_infos_2, scenario=4, z=3)
+                                    
+                                    if len(fields_regex_s4[0]) == len(payload_s4):
+                                        insert_statement = "".join(["INSERT INTO", " ", table_s4, fields_tuple_s4, " VALUES ", str(tuple(payload_s4))])
+                                        statements.append(insert_statement)
             
             print('\n', 'Finished processing scenario 4/5 - %s seconds' % (time.time() - start_time))
 
@@ -1316,34 +1326,35 @@ for configfile in args.config:
 
             for table_regex_s5 in tables_regexes_s5:
                 for table_s5, fields_regex_s5 in table_regex_s5.items():
-                    for match_s5 in re.finditer(fields_regex_s5[2], mm, overlapped=True, concurrent=True):
-                        
-                        unknown_header_s5, unknown_header_2_s5, limit_s5, payload_s5 = [], [], [], []
-                        a = match_s5.start()
-                        b = match_s5.end()
-                        record_infos_0 = 'Scenario 5 : deleted records overwritten until part of rowid'
-                        record_infos_1 = str(a)
-                        record_infos_2 = str(mainfile)
-                        fields_tuple_s5 = str(tuple(fields_regex_s5[0]))
-                        fields_tuple_s5 = fields_tuple_s5.replace('[', '')
-                        fields_tuple_s5 = fields_tuple_s5.replace(']', '')
+                    if len(fields_regex_s5[0]) > 4:
+                        for match_s5 in re.finditer(fields_regex_s5[2], mm, overlapped=True, concurrent=True):
+                            
+                            unknown_header_s5, unknown_header_2_s5, limit_s5, payload_s5 = [], [], [], []
+                            a = match_s5.start()
+                            b = match_s5.end()
+                            record_infos_0 = 'Scenario 5 : deleted records overwritten until part of rowid'
+                            record_infos_1 = str(a)
+                            record_infos_2 = str(mainfile)
+                            fields_tuple_s5 = str(tuple(fields_regex_s5[0]))
+                            fields_tuple_s5 = fields_tuple_s5.replace('[', '')
+                            fields_tuple_s5 = fields_tuple_s5.replace(']', '')
 
-                        mm.seek(a)
-                        
-                        decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
+                            mm.seek(a)
+                            
+                            decode_unknown_header(unknown_header_s5, unknown_header_2_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
 
-                        if not limit_s5:
-                            pass
-                        else:
-                            #If the freeblock length is equal to the sum of each type length plus the length until serial types
-                            #AND the sum of all types is not equal to 0 AND the length of the header is > 4 (next fb, actual fb, part of rowid, serial types array length, type1)
-                            if ((unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))) and ((sum(unknown_header_s5[3:]) != 0)) and (len(unknown_header_s5) > 3)):
+                            if not limit_s5:
+                                pass
+                            else:
+                                #If the freeblock length is equal to the sum of each type length plus the length until serial types
+                                #AND the sum of all types is not equal to 0 AND the length of the header is > 4 (next fb, actual fb, part of rowid, serial types array length, type1)
+                                if ((unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))) and ((sum(unknown_header_s5[3:]) != 0)) and (len(unknown_header_s5) > 3)):
 
-                                decode_record(b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos_0, record_infos_1, record_infos_2, scenario=5, z=4)
-                                
-                                if len(fields_regex_s5[0]) == len(payload_s5):
-                                    insert_statement = "".join(["INSERT INTO", " ", table_s5, fields_tuple_s5, " VALUES ", str(tuple(payload_s5))])
-                                    statements.append(insert_statement)
+                                    decode_record(b, payload_s5, unknown_header_s5, unknown_header_2_s5, fields_regex_s5, record_infos_0, record_infos_1, record_infos_2, scenario=5, z=4)
+                                    
+                                    if len(fields_regex_s5[0]) == len(payload_s5):
+                                        insert_statement = "".join(["INSERT INTO", " ", table_s5, fields_tuple_s5, " VALUES ", str(tuple(payload_s5))])
+                                        statements.append(insert_statement)
             
             print('\n', 'Finished processing scenario 5/5 - %s seconds' % (time.time() - start_time))
 
