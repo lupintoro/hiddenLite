@@ -31,7 +31,7 @@ Examples:
 **2) Write records to output database(s):**
 
         ````bash
-        sqlite_parser.py --config /path/to/config_file(s)_OR_directory_of_files --input /path/to/database_file(s)_OR_directory_of_files --linked True/False (True by default) --keyword example (not required) --output /path/to/output/folder
+        sqlite_parser.py --config /path/to/config_file(s)_OR_directory_of_files --input /path/to/database_file(s)_OR_directory_of_files --linked True/False (True by default) --single_column True/False (False by default) --keyword example (not required) --output /path/to/output/folder
         ````
 
 --config: provide every config.json file or a directory of config.json files that was/were created at step 1)
@@ -41,7 +41,11 @@ Examples:
 
 --linked: parse only files that are linked to the database used to create config.json file (True) or all sort of files (False)
 
---keyword: only parses records containing the keyword (case sensitive keyword searching, e.g. http)
+--single_column: parse overwritten records from 1-column tables (True) or not (False) 
+(if True, slows down parsing. Non-overwritten records (scenario 0) from 1-column tables are still parserd)
+
+--keyword: only parses records containing the keyword 
+(case sensitive keyword searching, e.g. http)
 
 --output: path to store output.db file(s)
 
@@ -49,7 +53,7 @@ Examples:
 
 Examples:
     
-    sqlite_parser.py --config config_mmssms.db --input mmssms.db --keyword SMS --output ./
+    sqlite_parser.py --config config_mmssms.db --input mmssms.db --single_column True --keyword SMS --output ./
     (here input file is already linked to initial database)
     
     sqlite_parser.py --config config_mmssms.db --input mmssms.db mmssms.db-journal mmssms.db-wal --keyword sms --output ./
