@@ -20,7 +20,7 @@
 
 Examples:
 
-    config.py -i directory -d False --o ./
+    config.py -i directory -d False -o ./
 
     config.py -i mmssms.db -d True -o ./
 
