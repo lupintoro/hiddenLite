@@ -234,7 +234,7 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
 
 
 #Function that translates argument provided as --default
-def default_mode(answer):
+def true_false(answer):
     #If user gives a boolean argument (True/False)
     if isinstance(answer, bool):
         return(answer)
@@ -279,14 +279,14 @@ def default_table(dictionary, name):
 
 #Command-line arguments and options
 parser = argparse.ArgumentParser()
-parser.add_argument("--input", nargs='+', help='Provide the database from which you want to extract the schema.')
-parser.add_argument("--default", type=default_mode, nargs='?', default=False, help='Create extra tables without the last 3 DEFAULT values. True/False')
-parser.add_argument("--output", nargs='?', help='Where do you want to save your config file(s)?')
+parser.add_argument("-i", "--input", nargs='+', help='Provide the database from which you want to extract the schema.')
+parser.add_argument("-d", "--default", type=true_false, nargs='?', default=False, help='Create extra tables without the last 3 DEFAULT values. True/False')
+parser.add_argument("-o", "--output", nargs='?', help='Where do you want to save your config file(s)?')
 args = parser.parse_args()
 
 
 #Retrieve argument user provided for --default
-default = default_mode(args.default)
+default = true_false(args.default)
 
 
 #Retrieve input files (databases from which schema will be retrieved)
@@ -812,6 +812,9 @@ for db_file in pbar:
                     #Append dictionary to config array
                     if fields_lists_config not in config:
                         config.append(fields_lists_config)
+                    
+                    #Sort config.json dicts by table name
+                    config[1:] = sorted(config[1:], key=lambda d: list(d.keys()))
 
 
             #Make a copy of a table if two tabales share the same name in the schema : table_name + '_copy' (until max 5 copies)

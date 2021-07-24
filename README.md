@@ -3,14 +3,16 @@
 **1) Create config.json file(s):**
 
         ````bash
-        config.py --input /path/to/database_file(s)_OR_directory_of_files --default True/False (False by default) --output /path/to/output/folder
+        config.py [-i input_file(s)_or_directory_path] [-d True/False (default False)] [-o output.json_path]
         ````
 
---input: provide database(s) to retrieve its/their schema (if directory, can contain all sort of files, not only databases)
+-i: provide database(s) to retrieve its/their schema (if directory, can contain all sort of files, not only databases)
 
---default: create extra tables without last 1,2,3 columns in case of table update (e.g. application update, table has more columns, old records keep their old structure)
+-d: create extra tables without last 1,2,3 columns in case of different record structure per table 
+(e.g. application update --> table has more columns but old records keep their old structure)
 
---output: path to store config.json file(s)
+-o: path to store config.json file(s)
+
 
 --> Possible to correct schema errors in the config.json file before running sqlite_parser.py or to remove tables that are not of interest
 
@@ -18,11 +20,11 @@
 
 Examples:
 
-    config.py --input directory --default False --output ./
+    config.py -i directory -d False --o ./
 
-    config.py --input mmssms.db --default True --output ./
+    config.py -i mmssms.db -d True -o ./
 
-    config.py --input mmssms.db snap.db --default False --output ./
+    config.py -i mmssms.db snap.db history.db -d False - ./
 
 
 
@@ -31,37 +33,42 @@ Examples:
 **2) Write records to output database(s):**
 
         ````bash
-        sqlite_parser.py --config /path/to/config_file(s)_OR_directory_of_files --input /path/to/database_file(s)_OR_directory_of_files --linked True/False (True by default) --single_column True/False (False by default) --keyword example (not required) --output /path/to/output/folder
+        sqlite_parser.py [-c config_file(s)_or_directory_path] [-i database_file(s)_or_directory_path] [-l True/False (default True)] [-s True/False (default False)] [-k keyword (not required)] [-o output.db_path]
         ````
 
---config: provide every config.json file or a directory of config.json files that was/were created at step 1)
+-c: provide every config.json file or a directory of config.json files that was/were created at step 1)
 
---input: provide all file(s) or directory of interest to parse 
-(e.g. WAL/journal files, many databases with same schema, a directory with files that have the same schema or with any sort of files)
+-i: provide all file(s) or directory of interest to parse 
+(e.g. WAL/journal files, many databases with same schema, a directory with any sort of files)
 
---linked: parse only files that are linked to the database used to create config.json file (True) or all sort of files (False)
+-l: parse only files that are linked to the database used to create config.json file (True) or all files provided (False)
 
---single_column: parse overwritten records from 1-column tables (True) or not (False) 
-(if True, slows down parsing. Non-overwritten records (scenario 0) from 1-column tables are still parserd)
+-s: parse overwritten records from 1-column tables (True, slows down parsing) or not (False) 
+(if False, non-overwritten records from 1-column tables are still parsed)
 
---keyword: only parses records containing the keyword 
+-k: only parses records containing the keyword 
 (case sensitive keyword searching, e.g. http)
 
---output: path to store output.db file(s)
+-o: path to store output.db file(s)
 
 
 
 Examples:
-    
-    sqlite_parser.py --config config_mmssms.db --input mmssms.db --single_column True --keyword SMS --output ./
+
+    sqlite_parser.py -c config_mmssms.json -i mmssms.db -s True -k SMS -o ./
     (here input file is already linked to initial database)
+    (here only records with keyword "SMS" will be parsed)
     
-    sqlite_parser.py --config config_mmssms.db --input mmssms.db mmssms.db-journal mmssms.db-wal --keyword sms --output ./
+    sqlite_parser.py -c config_mmssms.json -i mmssms.db mmssms.db-journal mmssms.db-wal -k sms -o ./
     (here input files are already linked to initial database)
 
-    sqlite_parser.py --config config_mmssms.db config_snap.db --input directory --linked False --output ./
-    (here parsing will be done in all files in the directory)
+    sqlite_parser.py -c config_history.json -i history.db -s True -k http -o ./
+    (here overwritten records from 1-column tables will also be parsed (-s True) which slows down parsing)
+    (here only records with keyword "http" will be parsed)
 
-    sqlite_parser.py --config directory1 --input directory2 --output ./
-    (directory1 contains config.json files of interest --> can contain other files)
-    (directory2 contains files linked with the initial database)
+    sqlite_parser.py -c config_mmssms.json config_snap.json -i directory -l False -o ./
+    (here parsing will be done for all files in the directory (-l False))
+
+    sqlite_parser.py -c directory1 -i directory2 -o ./
+    (directory1 contains config.json files of interest (can contain other files))
+    (directory2 contains files linked (-l default True) with initial databases used to create config.json files)
