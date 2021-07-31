@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 #Regex of a CREATE TABLE statement, if it's intact (s0) and for each scenario (s1-5) if the table was deleted
-#E.g. CREATE TABLE (type TEXT, name TEXT, tbl_name TEXT, rootpage INTEGR, sql statement TEXT)
-#--> type is always table of length 0x17
+#I.e. CREATE TABLE (type TEXT, name TEXT, tbl_name TEXT, rootpage INTEGR, sql statement TEXT)
+#--> first column (type TEXT) is always "table" of length 0x17 (5)
 regex_s0 = rb'(((([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
 regex_s1 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
 regex_s2 = rb'((([\x00-\xff]{4})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
@@ -19,7 +19,8 @@ regex_s5 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1
 
 
 
-#List of simplified valid type, removing any condition (e.g. UNIQUE, ASC, DESC, etc.)
+
+#List of simplified valid type, removing any condition (e.g. UNIQUE, ASC, DESC, PRIMARY KEY, FOREIGN KEY, etc.)
 types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT)(?!.*NO.*NULL)(?!.*PRIMARY.*KEY))':'INTEGER', 
 '((INT)(.*NO.*NULL))':'INTEGER NOT NULL', '(BOOL(?!.*NO.*NULL))':'BOOLEAN', '(BOOL.*NO.*NULL)':'BOOLEAN NOT NULL', 
 '((CHAR|TEXT|CLOB)(?!.*NO.*NULL))':'TEXT', '((CHAR|TEXT|CLOB)(.*NO.*NULL))':'TEXT NOT NULL', '((BLOB|GUID|UUID)(?!.*NO.*NULL))':'BLOB', 
@@ -34,13 +35,31 @@ list_types = ('INTEGER PRIMARY KEY', 'INTEGER', 'INTEGER NOT NULL', 'BOOLEAN', '
 
 
 
-#To decode Huffman coding
+#Function that decodes Huffman coding
 def huffmanEncoding(x,y):
     x = int(x)
     z = (x-128)*128
     a = z + int(y)
     
     return(hex(a))
+
+
+
+
+#Function that translates argument provided by user as True or False
+def true_false(answer):
+    #If user gives a boolean argument (True/False)
+    if isinstance(answer, bool):
+        return(answer)
+    #Elif user gives another argument that can be interpreted as True/False
+    elif answer.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif answer.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    #Else it's not a valid argument
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 
 
@@ -69,13 +88,14 @@ def serialTypes(serial_type):
 
 
 
-#Function that decodes bytes from possible true header into integers (so that we can do calculations on it afterwards) and appends them to unknown_header list
+#Function that decodes bytes from potential true header into integers (so that we can do calculations on it afterwards) and appends them to unknown_header list
 def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblock=bool):
     
     #a & b are the beginning and the end of the match respectivly
 
+    #Until end of the match
     count = 0
-
+    
     #If the record is overwritten by a freeblock, read 2 bytes (next freeblock offset) then 2 bytes (length of this freeblock)
     if freeblock:
         byte = int(struct.unpack('>H', mm.read(2))[0])
@@ -85,18 +105,23 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
         byte = int(struct.unpack('>H', mm.read(2))[0])
         unknown_header.append(byte)
         count+=2
-    
+
+
     #While not end of the match
     while count <= (b-a-1):
+        
         #Before serial types part (start header length): append(byte) to unknown_header
         if len(unknown_header) < len_start_header:
 
-            #Read byte by byte, convert in int, and append to unknown_header list
+            #Read byte by byte, convert in integer, and append to unknown_header list
             byte = int(struct.unpack('>B', mm.read(1))[0])
+            
+            #If byte < 0x80
             if byte < 128:
                 unknown_header.append(byte)
                 count+=1
-            #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
+            
+            #Else, handle Huffman encoding until 9 successive bytes
             else:
                 cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
@@ -158,16 +183,21 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
                                                 unknown_header.append(byte9)
         
         
-        #Serial types part : append(serialTypes(byte)) to unknown_header list
+        #Serial types part : append(serialTypes(byte)) to unknown_header
         else:
-            #Append limit to list to know how many bytes takes the start of the header (because 3 integers are not necessarily only 3 bytes)
+            
+            #Append limit to list of limits to know how many bytes takes the start of the header (because 3 integers are not necessarily only 3 bytes)
             limit.append(count)
-            #Read byte by byte, convert in int, and append to unknown_header list
+            
+            #Read byte by byte, convert in integer, and append to unknown_header list
             byte = int(struct.unpack('>B', mm.read(1))[0])
+            
+            #If byte < 0x80
             if byte < 128:
                 unknown_header.append(serialTypes(byte))
                 count+=1
-            #Handle Huffman encoding until 9 successive bytes (> 0x80 or > 128)
+            
+            #Else, handle Huffman encoding until 9 successive bytes
             else:
                 cont1 = int(struct.unpack('>B', mm.read(1))[0])
                 byte1 = int(huffmanEncoding(byte, cont1),16)
@@ -228,28 +258,12 @@ def decode_unknown_header(unknown_header, a, b, limit, len_start_header, freeblo
                                                 byte9 = int(huffmanEncoding(byte7, cont8),16)
                                                 unknown_header.append(serialTypes(byte9))
 
-
     return unknown_header, limit
 
 
 
-#Function that translates argument provided as --default
-def true_false(answer):
-    #If user gives a boolean argument (True/False)
-    if isinstance(answer, bool):
-        return(answer)
-    #Elif user gives another argument that can be interpreted as True/False
-    elif answer.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif answer.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    #Else it's not a valid argument
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
-
-
-#Function that creates the same table but without the last column, if --default True
+#Function that creates the same table 3 times but without the last 1-2-3 columns, if --default True
 def default_table(dictionary, name):
     for dictionaries in dictionary:
         for key2,value2 in dictionaries.items():
@@ -291,10 +305,8 @@ default = true_false(args.default)
 
 #Retrieve input files (databases from which schema will be retrieved)
 
-#List of --input files
-db_files = []
-#List of --input files' paths
-db_paths = []
+#List of --input files and their paths
+db_files, db_paths = [], []
 
 #For each database provided
 for file_name in args.input:
@@ -320,7 +332,7 @@ for file_name in args.input:
 
 
 
-#tqdm for progress bar per file processment, the description is the database's name
+#tqdm for progress bar per file processment, its description is the database's name
 pbar = tqdm(db_files)
 
 #For each database provided as input
@@ -797,7 +809,7 @@ for db_file in pbar:
                                     field_list_config[-5] += ' DEFAULT NULL'
 
 
-                    #Remove NOT NULL from first column because it will be a 0 for rowid tables!
+                    #Remove NOT NULL from first column because it will necessarily be a 0 for rowid tables!
                     try:
                         if 'NOT NULL' in field_list_config[1]:
                             field_list_config[1] = field_list_config[1].replace('NOT NULL', '')
@@ -838,7 +850,7 @@ for db_file in pbar:
         
             #If command-line argument --default True
             if default:
-                #Default case : take out one by one 3 last default for tables > 6 columns and create new tables, potential old versions
+                #Default case : take out one by one 3 last default for tables that have more than 6 columns and create new tables, potential old versions
                 #E.g. table name = sms, we will have table sms, table sms_default_0 without last column of sms, 
                 #table sms_default_0_1 without last column of sms_default_0, table sms_default_0_1_2 without last column of sms_default_0_1
                 keys_default = {}
@@ -868,8 +880,6 @@ for db_file in pbar:
             with open (args.output + output_config, 'w') as config_file:
                 json.dump(config, config_file, indent=2)
             
-            
-        
             #Close json file
             config_file.close()
         

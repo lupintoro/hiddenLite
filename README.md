@@ -33,7 +33,7 @@ Examples:
 **2) Write records to output database(s):**
 
         ````bash
-        sqlite_parser.py [-c config_file(s)_or_directory_path] [-i database_file(s)_or_directory_path] [-l True/False (default True)] [-s True/False (default False)] [-k keyword (not required)] [-o output.db_path]
+        sqlite_parser.py [-c config_file(s)_or_directory_path] [-i database_file(s)_or_directory_path] [-l True/False (default True)] [-k keyword (not required)] [-o output.db_path]
         ````
 
 -c: provide every config.json file or a directory of config.json files that was/were created at step 1)
@@ -42,9 +42,6 @@ Examples:
 (e.g. WAL/journal files, many databases with same schema, a directory with any sort of files)
 
 -l: parse only files that are linked to the database used to create config.json file (True) or all files provided (False)
-
--s: parse overwritten records from 1-column tables (True, slows down parsing) or not (False) 
-(if False, non-overwritten records from 1-column tables are still parsed)
 
 -k: only parses records containing the keyword 
 (case sensitive keyword searching, e.g. http)
@@ -55,15 +52,14 @@ Examples:
 
 Examples:
 
-    sqlite_parser.py -c config_mmssms.json -i mmssms.db -s True -k SMS -o ./
+    sqlite_parser.py -c config_mmssms.json -i mmssms.db -k SMS -o ./
     (here input file is already linked to initial database)
     (here only records with keyword "SMS" will be parsed)
     
     sqlite_parser.py -c config_mmssms.json -i mmssms.db mmssms.db-journal mmssms.db-wal -k sms -o ./
     (here input files are already linked to initial database)
 
-    sqlite_parser.py -c config_history.json -i history.db -s True -k http -o ./
-    (here overwritten records from 1-column tables will also be parsed (-s True) which slows down parsing)
+    sqlite_parser.py -c config_history.json -i history.db -k http -o ./
     (here only records with keyword "http" will be parsed)
 
     sqlite_parser.py -c config_mmssms.json config_snap.json -i directory -l False -o ./
