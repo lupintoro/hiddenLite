@@ -1396,6 +1396,10 @@ def main(args):
 
         """"Write records to output database"""
 
+        #If user didn't complete output path with final /
+        if not args.output.endswith("/"):
+            args.output += "/"
+
         #Connection to output database
         connection = sqlite3.connect(args.output + output_db, isolation_level=None)
 
