@@ -62,6 +62,10 @@ Examples:
     sqlite_parser.py -c config_history.json -i history.db -k http -o ./
     (here only records with keyword "http" will be parsed)
 
+    sqlite_parser.py -c config_history.json -i samsung.bin -l False -o ./
+    (here we give a binary image of a mobile device in which we want to search for browser history records)
+    (the linked -l argument must be False because it's not a file directly linked to history.db)
+
     sqlite_parser.py -c config_mmssms.json config_snap.json -i directory -l False -o ./
     (here parsing will be done for all files in the directory (-l False))
 
