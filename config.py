@@ -293,9 +293,9 @@ def default_table(dictionary, name):
 
 #Command-line arguments and options
 parser = argparse.ArgumentParser()
-parser.add_argument("-i", "--input", nargs='+', help='Provide the database from which you want to extract the schema.')
-parser.add_argument("-d", "--default", type=true_false, nargs='?', default=False, help='Create extra tables without the last 3 DEFAULT values. True/False')
-parser.add_argument("-o", "--output", nargs='?', help='Where do you want to save your config file(s)?')
+parser.add_argument("-i", "--input", nargs='+', help='Provide one, multiple or a directory of databases from which you want to extract the schema.')
+parser.add_argument("-d", "--default", type=true_false, nargs='?', default=False, help='Create extra tables without the last 3 DEFAULT values. True or False, False by default.')
+parser.add_argument("-o", "--output", nargs='?', help='Output to save config_database.json file(s).')
 args = parser.parse_args()
 
 
