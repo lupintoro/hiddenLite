@@ -520,7 +520,7 @@ for db_file in pbar:
                     #If table was added in payloads and it's a correct CREATE TABLE statement
                     if (payload_s1 in payloads) and (str(payload_s1[1]) != '') and ('index' not in payload_s1[0]) and ('CREATE I' not in payload_s1[-1]) and ((payload_s1[-1])[0:12] == 'CREATE TABLE'):
                         #Then notify the user that a deleted table was retrieved (records will be retrieved normally)
-                        print('Overwritten table', str(payload_s1), 'was retrieved successfully!')
+                        print('\n\n\n', 'Overwritten table', str('"'+payload_s1[1]+'"'), 'was successfully retrieved!', '\n\n')
 
 
 
@@ -547,7 +547,7 @@ for db_file in pbar:
                         if element[1] != payload_s2[1]:
                             payloads.append(payload_s2)
                     if (payload_s2 in payloads) and (str(payload_s2[1]) != '') and ('index' not in payload_s2[0]) and ('CREATE I' not in payload_s2[-1]) and ((payload_s2[-1])[0:12] == 'CREATE TABLE'):
-                        print('Overwritten table', str(payload_s2), 'was retrieved successfully!')
+                        print('\n\n\n', 'Overwritten table', str('"'+payload_s2[1]+'"'), 'was successfully retrieved!', '\n\n')
             
 
 
@@ -574,62 +574,7 @@ for db_file in pbar:
                         if element[1] != payload_s3[1]:
                             payloads.append(payload_s3)
                     if (payload_s3 in payloads) and  (str(payload_s3[1]) != '') and ('index' not in payload_s3[0]) and ('CREATE I' not in payload_s3[-1]) and ((payload_s3[-1])[0:12] == 'CREATE TABLE'):
-                        print('Overwritten table', str(payload_s3), 'was retrieved successfully!')
-            
-
-
-            #SCENARIO 4
-            matches_s4 = [match_s4 for match_s4 in re.finditer(regex_s4, mm, overlapped=True)]
-            for match_s4 in matches_s4:
-                unknown_header_s4, limit_s4, payload_s4 = [], [], []
-                a = match_s4.start()
-                b = match_s4.end()
-
-                mm.seek(a)
-
-                decode_unknown_header(unknown_header_s4, a, b, limit_s4, len_start_header=3, freeblock=True)
-    
-                #If the freeblock length is NOT equal to the sum of each type length plus the length of PART of the serial types array
-                #AND the freeblock length is equal to the sum of each type length plus the length until serial types plus the length in bytes of serial types
-                if (((sum(unknown_header_s4[2:]) + 4) != (unknown_header_s4[1])) and (unknown_header_s4[2] < 128) and (unknown_header_s4[1] == (sum(unknown_header_s4[2:])+128+4-1))):
-                   
-                    mm.seek(b)
-                    
-                    for l in ((unknown_header_s4)[3:]):
-                        payload_field_s4 = mm.read(l).decode('utf-8', errors='ignore')
-                        payload_s4.append(payload_field_s4)
-                    for element in payloads:
-                        if element[1] != payload_s4[1]:
-                            payloads.append(payload_s4)
-                    if (payload_s4 in payloads) and (str(payload_s4[1]) != '') and ('index' not in payload_s4[0]) and ('CREATE I' not in payload_s4[-1]) and ((payload_s4[-1])[0:12] == 'CREATE TABLE'):
-                        print('Overwritten table', str(payload_s4), 'was retrieved successfully!')
-             
-
-
-            #SCENARIO 5
-            matches_s5 = [match_s5 for match_s5 in re.finditer(regex_s5, mm, overlapped=True)]
-            for match_s5 in matches_s5:
-                unknown_header_s5, limit_s5, payload_s5 = [], [], []
-                a = match_s5.start()
-                b = match_s5.end()
-
-                mm.seek(a)
-
-                decode_unknown_header(unknown_header_s5, a, b, limit_s5, len_start_header=4, freeblock=True)
-    
-                #If the freeblock length is equal to the sum of each type length plus the length until serial types
-                if (unknown_header_s5[1] == (sum(unknown_header_s5[3:])+(limit_s5[0]-1))):
-                   
-                    mm.seek(b)
-                    
-                    for l in ((unknown_header_s5)[4:]):
-                        payload_field_s5 = mm.read(l).decode('utf-8', errors='ignore')
-                        payload_s5.append(payload_field_s5)
-                    for element in payloads:
-                        if element[1] != payload_s5[1]:
-                            payloads.append(payload_s5)
-                    if (payload_s5 in payloads) and (str(payload_s5[1]) != '') and ('index' not in payload_s5[0]) and ('CREATE I' not in payload_s5[-1]) and ((payload_s5[-1])[0:12] == 'CREATE TABLE'):
-                        print('Overwritten table', str(payload_s5), 'was retrieved successfully!')
+                        print('\n\n\n', 'Overwritten table', str('"'+payload_s3[1]+'"'), 'was successfully retrieved!', '\n\n')
 
 
 
