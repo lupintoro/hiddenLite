@@ -1129,8 +1129,9 @@ def decode_record(b, table, fields_regex, unknown_header, unknown_header_2, open
         if len(fields_regex[0]) == len(payload):
             #For columns' special names escaped with [], it must be removed to make an insert
             fields_tuple = str(tuple(fields_regex[0]))
-            fields_tuple = fields_tuple.replace('[', '')
-            fields_tuple = fields_tuple.replace(']', '')
+            if table != "[" or table != "]":
+                fields_tuple = fields_tuple.replace('[', '')
+                fields_tuple = fields_tuple.replace(']', '')
             statement = "".join(["INSERT INTO", " ", table, fields_tuple, " VALUES ", str(tuple(payload))])
 
             #Return the INSERT STATEMENT to write to output database

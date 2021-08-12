@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import argparse, os, struct, json, mmap, itertools, copy
+from fileinput import filename
 import regex as re
 from tqdm import tqdm
 from pathlib import Path
@@ -631,7 +632,6 @@ for db_file in pbar:
                     if type(table_name) == int:
                         table_name = 'special_character_' + str(table_name)
 
-                    
                     #Clean table's name
                     if table_name == "''":
                         table_name = '\'\''
@@ -640,6 +640,8 @@ for db_file in pbar:
                     table_name = table_name.replace("'", "apostrophe_exception_name")
                     table_name = table_name.replace('"', "quotation_exception_name")
                     table_name = table_name.replace('--', "double_dash_exception_name")
+                    table_name = table_name.replace('[', "bracket_exception_name")
+                    table_name = table_name.replace(']', "bracket_exception_name")
                     table_name = table_name.replace('%s', "parameterized_string_exception_name")
 
                     #Sanitize table name with [ ] to avoid internal names errors
@@ -648,7 +650,8 @@ for db_file in pbar:
 
                     #Escape unicode in tables' names
                     re_pattern = r'[^\\u0000-\u007F]'
-                    table_name = re.sub(re_pattern, '', table_name)
+                    if len(table_name) > 3:
+                        table_name = re.sub(re_pattern, '', table_name)
 
                     #Make sure fields is a tuple
                     if type(fields) == list:
@@ -678,10 +681,11 @@ for db_file in pbar:
                     fields = re.sub(r'(DECIMAL(.*)){1}', '', fields)
                     fields = re.sub(r'(NUMERIC(.*)){1}', '', fields)
                     fields = re.sub(r'(ON (DELETE|UPDATE) ((SET (NULL|DEFAULT))|CASCADE|RESTRICT|NO ACTION)){1}', '', fields)
-                    fields = re.sub(r'(ON CONFLICT (ROLLBACK|ABORT|FAIL|IGNORE|REPLACE){1}', '', fields)
-                    fields = re.sub(r'((GEENERATED( ALWAYS {0,1}) AS){1}( )*\({1}.+\)( STORED|VIRTUAL){0,1}', '', fields)
-                    fields = re.sub(r'((FILTER{1}( )*\({1}.+\)', '', fields)
-                    fields = re.sub(r'((RAISE{1}( )*\({1}.+\)', '', fields)
+                    fields = re.sub(r'(ON CONFLICT (ROLLBACK|ABORT|FAIL|IGNORE|REPLACE){1})', '', fields)
+                    fields = re.sub(r'((GENERATED( ALWAYS {0,1}) AS){1}( )*\({1}.+\)( STORED|VIRTUAL){0,1})', '', fields)
+                    fields = re.sub(r'(FILTER{1}( )*\({1}.+\))', '', fields)
+                    fields = re.sub(r'(RAISE{1}( )*\({1}.+\))', '', fields)
+                    fields = re.sub(r'(INTEGER{1}( )*\({1}.+\))', 'INTEGER', fields)
                     
 
                     #Fields are separated by commas in a CREATE TABLE statement
@@ -728,7 +732,6 @@ for db_file in pbar:
                             name_ = ''.join(['[', name_ ,']'])
                         
                         type_ = _name_[2]
-
 
                         #Clean name                        
                         if name_.startswith("'") and name_.endswith("'"):
@@ -865,6 +868,10 @@ for db_file in pbar:
             #Create config_databasename.json
             output_config = "config_%s.json" % file_name
 
+            #If user didn't complete output path with final /
+            if not args.output.endswith("/"):
+                args.output += "/"
+            
             #Write config array in the json file
             with open (args.output + output_config, 'w') as config_file:
                 json.dump(config, config_file, indent=2)
