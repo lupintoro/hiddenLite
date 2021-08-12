@@ -6,8 +6,6 @@ from itertools import chain
 from multiprocessing import cpu_count
 
 
-
-
 #Compute time elapsed after each scenario processing
 start_time = time.time()
 
@@ -30,7 +28,7 @@ real_not_null = r'([\x00-\x09]{1})'
 text = r'((([\x81-\xff]{1,8})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x00|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
 text_not_null = r'((([\x81-\xff]{1,8})([\x01|\x03|\x05|\x07|\x09|\x0b|\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}){1})|([\x0d|\x0f|\x11|\x13|\x15|\x17|\x19|\x1b|\x1d|\x1f|\x21|\x23|\x25|\x27|\x29|\x2b|\x2d|\x2f|\x31|\x33|\x35|\x37|\x39|\x3b|\x3d|\x3f|\x41|\x43|\x45|\x47|\x49|\x4b|\x4d|\x4f|\x51|\x53|\x55|\x57|\x59|\x5b|\x5d|\x5f|\x61|\x63|\x65|\x67|\x69|\x6b|\x6d|\x6f|\x71|\x73|\x75|\x77|\x79|\x7b|\x7d|\x7f]{1}))'
 
-#Blobs : odd values
+#Blobs : even values
 blob = r'((([\x81-\xff]{1,8})([\x00|\x02|\x04|\x06|\x08|\x0a|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}){1})|([\x00|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}))'
 blob_not_null = r'((([\x81-\xff]{1,8})([\x00|\x02|\x04|\x06|\x08|\x0a|\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}){1})|([\x0c|\x0e|\x10|\x12|\x14|\x16|\x18|\x1a|\x1c|\x1e|\x20|\x22|\x24|\x26|\x28|\x2a|\x2c|\x2e|\x30|\x32|\x34|\x36|\x38|\x3a|\x3c|\x3e|\x40|\x42|\x44|\x46|\x48|\x4a|\x4c|\x4e|\x50|\x52|\x54|\x56|\x58|\x5a|\x5c|\x5e|\x60|\x62|\x64|\x66|\x68|\x6a|\x6c|\x6e|\x70|\x72|\x74|\x76|\x78|\x7a|\x7c|\x7e|\x80]{1}))'
 
@@ -213,7 +211,7 @@ def build_regex(fields_numbers, fields_types, fields_names, tables_names, header
     fb_min, fb_max, count_min, count_max, counter_min, counter_max = 4, 4, 1, 2, 1, 1
 
     #General regex for the rowid on max 9-bytes (can be anything)
-    row_id = r'((([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})){1})'
+    row_id = r'((([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x01-\x80]{1})){1})'
     
     #General regex for the next freeblock offset on 2-bytes (can be anything)
     next_freeblock = r'([\x00-\xff]{2})'
@@ -303,6 +301,16 @@ def build_regex(fields_numbers, fields_types, fields_names, tables_names, header
             if freeblock:
                 #We have a min freeblock length
                 fb_min += minimum
+
+                #Freeblock overwrittes each time one more byte
+                if scenario == 1:
+                    fb_min -= 1
+                elif scenario == 2:
+                    fb_min = fb_min
+                elif scenario == 3 or scenario == 4:
+                    fb_min += 1
+                elif scenario == 5:
+                    fb_min += 2
                 
                 #If it's a "one-digit" hex number, fill it with a 0 (e.g. 9 --> 09)
                 if fb_min < 16:
@@ -318,11 +326,11 @@ def build_regex(fields_numbers, fields_types, fields_names, tables_names, header
                 if scenario == 1:
                     freeblock_length = rf'(([\x00]{{1}}[\x{fb_min}-\x82]{{1}}))'
                 
-                #If scenario == 2, payload length may be of 2 bytes --> maximum freeblock length is 16'386 (x4002)
-                elif scenario == 2:
+                #If scenario == 2, 3, 4 or 5, maximum freeblock length is 16'386 (x4002), otherwise overflows onto other pages and not recoverable because freeblock length does not correspond anymore
+                elif scenario == 2 or scenario == 3 or scenario == 4 or scenario == 5:
                     freeblock_length = rf'(([\x01-\x39]{{1}}[\x00-\xff]{{1}})|([\x40]{{1}}[\x00-\x02]{{1}})|([\x00]{{1}}[\x{fb_min}-\xff]{{1}}))'
                 
-                #Else, can be anything and we only know the minimum
+                #Else, scenario = 0, can be anything and we only know the minimum
                 else:
                     freeblock_length = rf'(([\x00]{{1}}[\x{fb_min}-\xff]{{1}})|([\x01-\xff]{{1}}[\x00-\xff]{{1}}))'
                 
@@ -532,12 +540,17 @@ def build_regex(fields_numbers, fields_types, fields_names, tables_names, header
             for k,v in dict_types.items():
                 if i == k:
                     header_pattern[n] = v
-
+        
         #Add start header at index 0 of header pattern
         index = headers_patterns.index(header_pattern)
         header_pattern.insert(0, starts_headers[index])
         
-        
+        #Cannot recover very long freeblock overwritten records, because overflow onto other pages and freeblock length does not correspond anymore
+        if scenario == 1:
+            header_pattern = [sub.replace('1,8', '0') for sub in header_pattern]
+        if scenario == 2 or scenario == 3 or scenario == 4 or scenario == 5:
+            header_pattern = [sub.replace('1,8', '1') for sub in header_pattern]
+
         #Concatenate all regexes of a given table
         #E.g. [[\x00]{1}, [\x00-\x09]{1}, [\x00-\x09]{1}] --> [[\x00]{1}[\x00-\x09]{1}[\x00-\x09]{1}]
         regex_construct = ''.join(header_pattern)
@@ -547,7 +560,6 @@ def build_regex(fields_numbers, fields_types, fields_names, tables_names, header
         regex_construct = re.compile(regex_construct)
         #Append to list of regexes
         regex_constructs.append(regex_construct)
-
 
 
     #Link together in a dict the table name, columns names, types identifyings and the whole regex for that table
@@ -575,7 +587,7 @@ def find_matches(mainfile, open_file, table, fields_regex, scenario):
     
     #Variables to pass to decode_unknown_header function
     unknown_header, unknown_header_2, limit, matches = [], [], [], []
-    if scenario==0:
+    if scenario == 0:
         len_start_header = 3
         freeblock = False
     elif scenario == 1 or scenario == 2:
@@ -1181,7 +1193,7 @@ def main(args):
             if key == "file name":
                 output_db = "".join(['output_', value, '.db'])
             #Quit script if encoding other than utf-8
-            if key == "text encoding" and value != 1:
+            if key == "text encoding" and value != 'UTF-8':
                 sys.exit("Database encoding is not utf-8!")
 
         #Retrieve the database schema from data[1:]

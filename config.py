@@ -7,18 +7,13 @@ from pathlib import Path
 
 
 
-#Regex of a CREATE TABLE statement, if it's intact (s0) and for each scenario (s1-5) if the table was deleted
+#Regex of a CREATE TABLE statement, if it's intact (s0) and for each scenario (s1-3) if the table was deleted
 #I.e. CREATE TABLE (type TEXT, name TEXT, tbl_name TEXT, rootpage INTEGR, sql statement TEXT)
 #--> first column (type TEXT) is always "table" of length 0x17 (5)
-regex_s0 = rb'(((([\x03-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-regex_s1 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-regex_s2 = rb'((([\x00-\xff]{4})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-regex_s3 = rb'((([\x00-\xff]{4})(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-regex_s4 = rb'((([\x00-\xff]{4})([\x02-\x80]{1})([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-regex_s5 = rb'((([\x00-\xff]{4})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x02-\x80]{1})|([\x81-\xff]{1,8}[\x00-\x80]{1}))([\x17]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1}))([\x00-\x09]{1})(([\x81-\xff]{1,8}[\x00-\x80]{1})|([\x00-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
-
-
-
+regex_s0 = rb'(((([\x37-\x80]{1})|([\x81-\xff]{1}[\x00-\x80]{1}))(([\x81-\xff]{1}[\x00-\x80]{1})|([\x01-\x80]{1}))([\x06-\x0E]{1})([\x17]{1})([\x01-\x80]{1})([\x01-\x80]{1})([\x00-\x09]{1})(([\x81-\xff]{1}[\x00-\x80]{1})|([\x19-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s1 = rb'((([\x00-\xff]{2})([\x00]{1}[\x37-\x82]{1})([\x01-\x80]{1})([\x01-\x80]{1})([\x00-\x09]{1})(([\x81-\xff]{1}[\x00-\x80]{1})|([\x19-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s2 = rb'((([\x00-\xff]{2})(([\x01-\x39]{1}[\x00-\xff]{1})|([\x40]{1}[\x00]{1})|([\x00]{1}[\x37-\xff]{1}))([\x17]{1})([\x01-\x80]{1})([\x01-\x80]{1})([\x00-\x09]{1})(([\x81-\xff]{1}[\x00-\x80]{1})|([\x19-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
+regex_s3 = rb'((([\x00-\xff]{2})(([\x01-\x39]{1}[\x00-\xff]{1})|([\x40]{1}[\x00]{1})|([\x00]{1}[\x37-\xff]{1}))([\x06-\x0E]{1})([\x17]{1})([\x01-\x80]{1})([\x01-\x80]{1})([\x00-\x09]{1})(([\x81-\xff]{1}[\x00-\x80]{1})|([\x19-\x80]{1})))((?=(.*\x74\x61\x62\x6C\x65))))'
 
 #List of simplified valid type, removing any condition (e.g. UNIQUE, ASC, DESC, PRIMARY KEY, FOREIGN KEY, etc.)
 types_affinities = {'(INTEGER PRIMARY KEY)':'INTEGER PRIMARY KEY', '((INT)(?!.*NO.*NULL)(?!.*PRIMARY.*KEY))':'INTEGER', 
@@ -271,7 +266,7 @@ def default_table(dictionary, name):
             list_keys = list(value2.keys())
 
             #If last column contains a DEFAULT value and the table has more than 6 columns
-            if 'DEFAULT' in list_values[-1] and len(list_values) > 6:
+            if 'DEFAULT' in list_values[-1] and ((len(list_values) > 6 and name == '_default_0]') or (len(list_values) > 5 and name == '_1]') or (len(list_values) > 4 and name == '_2]')):
                 #Make a copy of the table
                 default_dict = copy.deepcopy(dictionaries)
                 #Pop out last column and rename table (cannot have twice same table name)
@@ -388,51 +383,84 @@ for db_file in pbar:
 
             #Page size
             page_size = int(struct.unpack('>H', mm.read(2))[0])
-            db_infos["page size"] = page_size
+            db_infos["page size"] = str(page_size) + ' bytes'
 
             #Write version
             file_format_w = int(struct.unpack('>B', mm.read(1))[0])
-            db_infos["write version"] = file_format_w
+            if file_format_w == 0:
+                db_infos["write version"] = 'OFF'
+            elif file_format_w == 1:
+                db_infos["write version"] = 'Journal'
+            elif file_format_w == 2:
+                db_infos["write version"] = 'WAL'
+            else:
+                db_infos["write version"] = 'value problem'
+          
 
             #Read version
             file_format_r = int(struct.unpack('>B', mm.read(1))[0])
-            db_infos["read version"] = file_format_r
+            if file_format_w == 0:
+                db_infos["read version"] = 'OFF'
+            elif file_format_w == 1:
+                db_infos["read version"] = 'Journal'
+            elif file_format_w == 2:
+                db_infos["read version"] = 'WAL'
+            else:
+                db_infos["read version"] = 'value problem'
             
             #Reserved bytes
             reserved_bytes = int(struct.unpack('>B', mm.read(1))[0])
-            db_infos["reserved bytes"] = reserved_bytes
+            db_infos["reserved bytes"] = str(reserved_bytes) + ' bytes'
 
             mm.read(3)
             
             #Database updates
             file_change_counter = int(struct.unpack('>i', mm.read(4))[0])
-            db_infos["database updates"] = file_change_counter
+            db_infos["database updates"] = str(file_change_counter)
 
             #Number of pages
             number_pages = int(struct.unpack('>i', mm.read(4))[0])
-            db_infos["number of pages"] = number_pages
+            db_infos["number of pages"] = str(number_pages)
 
             #Database size
             db_size = int(page_size) * int(number_pages)
-            db_infos["database size"] = db_size
+            db_infos["database size"] = str(db_size) + ' bytes'
 
             mm.read(8)
 
             #Schema changes
             schema_cookie = int(struct.unpack('>i', mm.read(4))[0]) 
-            db_infos["schema changes"] = schema_cookie
+            db_infos["schema changes"] = str(schema_cookie)
 
-            mm.read(12)
+            mm.read(8)
+
+            #Auto-vacuum parameter
+            auto_vacuum = int(struct.unpack('>i', mm.read(4))[0]) 
+            if auto_vacuum == 0:
+                db_infos["auto-vacuum"] = 'OFF'
+            else:
+                db_infos["auto-vacuum"] = 'ON'
 
             #Text encoding
             text_encoding = int(struct.unpack('>i', mm.read(4))[0])
-            db_infos["text encoding"] = text_encoding
+            if text_encoding == 1:
+                db_infos["text encoding"] = 'UTF-8'
+            elif text_encoding == 2:
+                db_infos["text encoding"] = 'UTF-16le'
+            elif text_encoding == 3:
+                db_infos["text encoding"] = 'UTF-16be'
+            else:
+                db_infos["text encoding"] = 'value problem'
+
 
             mm.read(36)
 
             #SQLite version
             sqlite_version = int(struct.unpack('>i', mm.read(4))[0])
-            db_infos["sqlite version"] = sqlite_version
+            a = round(sqlite_version/1000000)
+            b = round((sqlite_version-(a*1000000))/1000)
+            c = sqlite_version-(a*1000000)-(b*1000)
+            db_infos["sqlite version"] = str(a) + '.' + str(b) + '.' + str(c)
 
             #Config.json file is an array of dicts
             config = []
@@ -447,8 +475,6 @@ for db_file in pbar:
             regex_s1 = re.compile(regex_s1)
             regex_s2 = re.compile(regex_s2)
             regex_s3 = re.compile(regex_s3)
-            regex_s4 = re.compile(regex_s4)
-            regex_s5 = re.compile(regex_s5)
             
             
             #List of CREATE TABLE statements
@@ -488,7 +514,7 @@ for db_file in pbar:
             
 
 
-            #Overwritten statements according to 5 scenarios
+            #Overwritten statements according to 3 scenarios
 
             #SCENARIO 1
             matches_s1 = [match_s1 for match_s1 in re.finditer(regex_s1, mm, overlapped=True)]
@@ -616,6 +642,7 @@ for db_file in pbar:
                     table_name = table_name.replace('--', "double_dash_exception_name")
                     table_name = table_name.replace('%s', "parameterized_string_exception_name")
 
+                    #Sanitize table name with [ ] to avoid internal names errors
                     if (not table_name.startswith('[')) and (not table_name.endswith(']')):
                         table_name = ''.join(['[', table_name ,']'])
 
@@ -641,9 +668,21 @@ for db_file in pbar:
                     fields = re.sub(r'(, PRIMARY KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(UNIQUE){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(FOREIGN KEY){1}( )*\({1}.+', '', fields)
+                    fields = re.sub(r'(DISTINCT){1}( )*\({1}.+\)', '', fields)
                     fields = re.sub(r'(CHECK){1}( )*\({1}.+', '', fields)
+                    fields = re.sub(r'(COLLATE ){1}.*', '', fields)
+                    fields = re.sub(r'(ASC ){1}.*', '', fields)
+                    fields = re.sub(r'(DESC ){1}.*', '', fields)
                     fields = re.sub(r'(REFERENCES ){1}.*', '', fields)
                     fields = re.sub(r'(CONSTRAINT ){1}.*', '', fields)
+                    fields = re.sub(r'(DECIMAL(.*)){1}', '', fields)
+                    fields = re.sub(r'(NUMERIC(.*)){1}', '', fields)
+                    fields = re.sub(r'(ON (DELETE|UPDATE) ((SET (NULL|DEFAULT))|CASCADE|RESTRICT|NO ACTION)){1}', '', fields)
+                    fields = re.sub(r'(ON CONFLICT (ROLLBACK|ABORT|FAIL|IGNORE|REPLACE){1}', '', fields)
+                    fields = re.sub(r'((GEENERATED( ALWAYS {0,1}) AS){1}( )*\({1}.+\)( STORED|VIRTUAL){0,1}', '', fields)
+                    fields = re.sub(r'((FILTER{1}( )*\({1}.+\)', '', fields)
+                    fields = re.sub(r'((RAISE{1}( )*\({1}.+\)', '', fields)
+                    
 
                     #Fields are separated by commas in a CREATE TABLE statement
                     fields = fields.split(',')
@@ -662,17 +701,14 @@ for db_file in pbar:
                         if i.startswith(' '):
                             i = i[1:]
                         i = i.replace('\t', ' ')
+                        i = i.replace('\r', ' ')
                         i = i.replace('\n', '')
                         i = i.replace('\\', '')
                         if i.startswith(' "'):
                             i = i[2:]
-                        if i.startswith('   '):
-                            i = i[3:]
-                        if i.startswith('  '):
-                            i = i[2:]
-                        if i.startswith(' '):
+                        while i.startswith(' '):
                             i = i[1:]
-                        
+
                         #Separate column's name and type by first space (if column name has a space, we will lose the second part)
                         _name_ = i.partition(' ')
                         
@@ -680,12 +716,14 @@ for db_file in pbar:
                         if _name_[0] == '':
                             _name_ = i.partition(' ')
 
+                        
                         #Name is before space, type is after space
                         name_ = _name_[0]
                         
                         #Escape unicode in names
                         name_ = re.sub(re_pattern, '', name_)
                         
+                        #Sanitize column name with [ ] to avoid internal names errors
                         if (not name_.startswith('[')) and (not name_.endswith(']')):
                             name_ = ''.join(['[', name_ ,']'])
                         
@@ -732,7 +770,7 @@ for db_file in pbar:
                                     type_ = 'NUMERIC NOT NULL'
                                 else:
                                     type_ = 'NUMERIC'
-                            
+
                             #Append name and type dicts elements to field_list_config list
                             field_list_config.append(name_)
                             field_list_config.append(type_)
@@ -746,12 +784,18 @@ for db_file in pbar:
                             if 'DEFAULT' not in field_list_config[-1]:
                                 if 'NOT NULL' not in field_list_config[-1]:
                                     field_list_config[-1] += ' DEFAULT NULL'
+                                else:
+                                    field_list_config[-1] += ' DEFAULT 0'
                             if 'DEFAULT' not in field_list_config[-3]:
                                 if 'NOT NULL' not in field_list_config[-3]:
                                     field_list_config[-3] += ' DEFAULT NULL'
+                                else:
+                                    field_list_config[-3] += ' DEFAULT 0'
                             if 'DEFAULT' not in field_list_config[-5]:
                                 if 'NOT NULL' not in field_list_config[-5]:
                                     field_list_config[-5] += ' DEFAULT NULL'
+                                else:
+                                    field_list_config[-5] += ' DEFAULT 0'
 
 
                     #Remove NOT NULL from first column because it will necessarily be a 0 for rowid tables!
@@ -774,7 +818,7 @@ for db_file in pbar:
                     config[1:] = sorted(config[1:], key=lambda d: list(d.keys()))
 
 
-            #Make a copy of a table if two tabales share the same name in the schema : table_name + '_copy' (until max 5 copies)
+            #Make a copy of a table if two tables share the same name in the schema : table_name + '_copy' (until max 5 copies)
             keys_copies = {}
 
             for i in range(5):
