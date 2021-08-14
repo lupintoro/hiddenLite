@@ -646,6 +646,8 @@ for db_file in pbar:
                         table_name = '\'\''
                     if table_name == '""':
                         table_name = '\"\"'
+                    
+                    #Sanitize internal sqlite symbols
                     table_name = table_name.replace("'", "apostrophe_exception_name")
                     table_name = table_name.replace('"', "quotation_exception_name")
                     table_name = table_name.replace('--', "double_dash_exception_name")
@@ -653,7 +655,7 @@ for db_file in pbar:
                     table_name = table_name.replace(']', "bracket_exception_name")
                     table_name = table_name.replace('%s', "parameterized_string_exception_name")
 
-                    #Sanitize table name with [ ] to avoid internal names errors
+                    #Sanitize table name by adding [ ] to avoid internal names errors
                     if (not table_name.startswith('[')) and (not table_name.endswith(']')):
                         table_name = ''.join(['[', table_name ,']'])
 
