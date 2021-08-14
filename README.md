@@ -66,23 +66,40 @@ Examples:
 
 Examples:
 
+
     sqlite_parser.py -c config_mmssms.json -i mmssms.db -k SMS -o ./
+    
     (here input file is already linked to initial database)
     (here only records with keyword "SMS" will be parsed)
     
+
+
     sqlite_parser.py -c config_mmssms.json -i mmssms.db mmssms.db-journal mmssms.db-wal -k sms -o ./
+    
     (here input files are already linked to initial database)
 
+
+    
     sqlite_parser.py -c config_history.json -i history.db -k http -o ./
+    
     (here only records with keyword "http" will be parsed)
 
+
+    
     sqlite_parser.py -c config_history.json -i samsung.bin -l False -o ./
+    
     (here we give a binary image of a mobile device in which we want to search for browser history records)
     (the linked -l argument must be False because it's not a file directly linked to history.db)
 
+    
+
     sqlite_parser.py -c config_mmssms.json config_snap.json -i directory -l False -o ./
+    
     (here parsing will be done for all files in the directory (-l False))
 
+
+    
     sqlite_parser.py -c directory1 -i directory2 -o ./
+    
     (directory1 contains config.json files of interest (can contain other files))
     (directory2 contains files linked (-l default True) with initial databases used to create config.json files)
