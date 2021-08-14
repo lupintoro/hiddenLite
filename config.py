@@ -1,4 +1,13 @@
 #!/usr/bin/python3
+
+##########      config.py     ##########
+""""
+This script retrieves table schemas from a database file given as argument and writes 
+the database's and schema's information to a config_database.json file.
+"""
+
+
+
 import argparse, os, struct, json, mmap, itertools, copy
 from fileinput import filename
 import regex as re
@@ -673,11 +682,11 @@ for db_file in pbar:
                     fields = re.sub(r'(FOREIGN KEY){1}( )*\({1}.+', '', fields)
                     fields = re.sub(r'(DISTINCT){1}( )*\({1}.+\)', '', fields)
                     fields = re.sub(r'(CHECK){1}( )*\({1}.+', '', fields)
-                    fields = re.sub(r'(COLLATE ){1}.*', '', fields)
-                    fields = re.sub(r'(ASC ){1}.*', '', fields)
-                    fields = re.sub(r'(DESC ){1}.*', '', fields)
-                    fields = re.sub(r'(REFERENCES ){1}.*', '', fields)
-                    fields = re.sub(r'(CONSTRAINT ){1}.*', '', fields)
+                    fields = re.sub(r'(COLLATE ){1}', '', fields)
+                    fields = re.sub(r'(ASC ){1}', '', fields)
+                    fields = re.sub(r'(DESC ){1}', '', fields)
+                    fields = re.sub(r'(REFERENCES ){1}', '', fields)
+                    fields = re.sub(r'(CONSTRAINT ){1}', '', fields)
                     fields = re.sub(r'(DECIMAL(.*)){1}', '', fields)
                     fields = re.sub(r'(NUMERIC(.*)){1}', '', fields)
                     fields = re.sub(r'(ON (DELETE|UPDATE) ((SET (NULL|DEFAULT))|CASCADE|RESTRICT|NO ACTION)){1}', '', fields)

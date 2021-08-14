@@ -1,4 +1,18 @@
 # hiddenLite
+
+HiddenLite parses a file and retrieves all matches found with regular expressions of SQLite records. It can thus recover current database records, but also deleted or unreferenced records. This tool parses SQLite databases, but also journal/WAL files, binary images or any other file provided to it.
+
+
+##########      config.py     ##########
+
+This script retrieves table schemas from a database file given as argument and writes the database's and schema's information to a config_database.json file.
+
+
+##########      sqlite_parser.py     ##########
+
+This script takes config_database.json and a file to parse as arguments. It then scans the latter for matches with regular expressions of records, generated according to the schema provided by config_database.json. The retrieved records are written to an output_database.db of same schema as the one retrieved by config.py.
+
+
  
 **1) Create config.json file(s):**
 

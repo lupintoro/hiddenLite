@@ -1,9 +1,23 @@
 #!/usr/bin/python3
+
+##########      sqlite_parser.py     ##########
+"""
+This script takes config_database.json and a file to parse as arguments. 
+It then scans the latter for matches with regular expressions of records, 
+generated according to the schema provided by config_database.json.
+The retrieved records are written to an output_database.db of same schema 
+as the one retrieved by config.py.
+"""
+
+
+
 import argparse, sys, os, struct, json, mmap, sqlite3, tqdm, copy, time, multiprocessing
 import regex as re
 from ast import literal_eval
 from itertools import chain
 from multiprocessing import cpu_count
+
+
 
 
 #Compute time elapsed after each scenario processing
@@ -1400,7 +1414,7 @@ def main(args):
                     
                     #Print time elapsed for each scenario processing
                     print('\n', 'Finished processing scenario %s/5 - %s seconds' % (str((matches_args[0])[4]), (time.time() - start_time)))
-            
+        
             #Close file
             file.close()
 
