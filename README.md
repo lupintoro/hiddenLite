@@ -1,4 +1,4 @@
-# hiddenLite
+# hiddenLite - SQLite records carving
 
 HiddenLite parses a file and retrieves all matches found with regular expressions of SQLite records according to a schema. It can thus recover current database records, but also deleted or unreferenced records. This tool parses SQLite databases, journal/WAL files, binary images or any other file provided to it.
 
